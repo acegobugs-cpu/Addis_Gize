@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Media } from "@/app/types/types";
-import { apiClient } from "@/app/lib/api";
+import { getMedia, uploadFile } from "@/app/lib/api";
 
 interface MediaBlockProps {
   data: Media;
@@ -28,7 +28,7 @@ export default function MediaBlock({ data, onChange }: MediaBlockProps) {
     try {
       setUploading(true);
       // Using our apiClient for upload
-      const result: any = await apiClient.uploadFile(formData);
+      const result: any = await uploadFile(formData);
       onChange({ ...data, url: result.url, source: "local" });
       setShowModal(false);
     } catch (err) {
@@ -132,7 +132,7 @@ function SelectMedia({
   useEffect(() => {
     const fetchUploadedFiles = async () => {
       try {
-        const mediaFiles = await apiClient.getMedia();
+        const mediaFiles = await getMedia();
         setUploadedFiles(mediaFiles.files.map((file) => file));
       } catch (error) {
         console.error("Failed to fetch uploaded files:", error);

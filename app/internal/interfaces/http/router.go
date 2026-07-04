@@ -144,16 +144,16 @@ func (r *Router) setupMiddleware(l *limiter.Limiter) {
 	})
 	r.router.Use(corsMiddleware.Handler)
 
-	// Rate limiting - use configured global rate limit, but wrap it to ignore OPTIONS requests
-	r.router.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			if req.Method == http.MethodOptions {
-				next.ServeHTTP(w, req)
-				return
-			}
-			l.GlobalRateLimit(next).ServeHTTP(w, req)
-		})
-	})
+	// // Rate limiting - use configured global rate limit, but wrap it to ignore OPTIONS requests
+	// r.router.Use(func(next http.Handler) http.Handler {
+	// 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	// 		if req.Method == http.MethodOptions {
+	// 			next.ServeHTTP(w, req)
+	// 			return
+	// 		}
+	// 		l.GlobalRateLimit(next).ServeHTTP(w, req)
+	// 	})
+	// })
 }
 
 // setupRoutes sets up application routes
@@ -171,11 +171,11 @@ func (r *Router) setupRoutes(l *limiter.Limiter) {
 			})
 
 			router.Group(func(router chi.Router) {
-				// router.Use(l.AuthGroup)  .With(l.Login)
+				// router.Use(l.AuthGroup)
 				router.Use(r.csrfProtection.Middleware)
-				router.Post("/login", r.authHandler.Login)
+				router.With(l.Login).Post("/login", handlers.ValidateBody[handlers.LoginRequest](r.handler, r.authHandler.Login))
 				router.With(l.Register).Post("/register", handlers.ValidateBody[handlers.SigninRequest](r.handler, r.authHandler.Register))
-				router.With(l.Refresh).Post("/refresh", r.authHandler.RefreshToken)
+				router.With(l.CustomLimiter(10, 1*time.Minute)).Post("/refresh", r.authHandler.RefreshToken)
 			})
 
 			router.Group(func(router chi.Router) {
@@ -205,27 +205,41 @@ func (r *Router) setupRoutes(l *limiter.Limiter) {
 
 		// Article routes with CSRF protection for state-changing operations
 		router.Route("/articles", func(router chi.Router) {
-			router.With(r.csrfProtection.Middleware).With(r.authMiddleware.Middleware).Post("/", r.articleHandler.CreateArticle)
-			router.Get("/", r.articleHandler.ListArticles)
-			router.Get("/search", r.articleHandler.SearchArticles)
-			router.Route("/{id}", func(router chi.Router) {
-				router.Get("/", r.articleHandler.GetArticle)
-				router.With(r.authMiddleware.Middleware).With(r.csrfProtection.Middleware).Put("/", r.articleHandler.UpdateArticle)
-				router.With(r.authMiddleware.Middleware).With(r.csrfProtection.Middleware).Delete("/", r.articleHandler.DeleteArticle)
+			router.Group(func(router chi.Router) {
+				router.Get("/", r.articleHandler.ListArticles)
+				router.Get("/search", r.articleHandler.SearchArticles)
+				router.Get("/{id}", r.articleHandler.GetArticle)
+				router.Get("/slug/{slug}", r.articleHandler.GetArticleBySlug)
 			})
-			router.Get("/slug/{slug}", r.articleHandler.GetArticleBySlug)
+
+			router.Group(func(router chi.Router) {
+				router.Use(r.csrfProtection.Middleware)
+				router.Use(r.authMiddleware.Middleware)
+				router.Post("/", r.articleHandler.CreateArticle)
+				router.Route("/{id}", func(router chi.Router) {
+					router.Put("/", r.articleHandler.UpdateArticle)
+					router.Delete("/", r.articleHandler.DeleteArticle)
+				})
+			})
 		})
 
 		// Category routes with CSRF protection for state-changing operations
 		router.Route("/categories", func(router chi.Router) {
-			router.With(r.csrfProtection.Middleware).With(r.authMiddleware.Middleware).Post("/", r.categoryHandler.CreateCategory)
-			router.Get("/", r.categoryHandler.ListCategories)
-			router.Route("/{id}", func(router chi.Router) {
-				router.Get("/", r.categoryHandler.GetCategory)
-				router.With(r.authMiddleware.Middleware).With(r.csrfProtection.Middleware).Put("/", r.categoryHandler.UpdateCategory)
-				router.With(r.authMiddleware.Middleware).With(r.csrfProtection.Middleware).Delete("/", r.categoryHandler.DeleteCategory)
+			router.Group(func(router chi.Router) {
+				router.Get("/", r.categoryHandler.ListCategories)
+				router.Get("/{id}", r.categoryHandler.GetCategory)
+				router.Get("/slug/{slug}", r.categoryHandler.GetCategoryBySlug)
 			})
-			router.Get("/slug/{slug}", r.categoryHandler.GetCategoryBySlug)
+
+			router.Group(func(router chi.Router) {
+				router.Use(r.csrfProtection.Middleware)
+				router.Use(r.authMiddleware.Middleware)
+				router.Post("/", r.categoryHandler.CreateCategory)
+				router.Route("/{id}", func(router chi.Router) {
+					router.With(r.authMiddleware.Middleware).With(r.csrfProtection.Middleware).Put("/", r.categoryHandler.UpdateCategory)
+					router.With(r.authMiddleware.Middleware).With(r.csrfProtection.Middleware).Delete("/", r.categoryHandler.DeleteCategory)
+				})
+			})
 		})
 
 		// Authorized email routes with CSRF protection for state-changing operations

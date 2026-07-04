@@ -3,9 +3,9 @@ import { useState, useEffect } from "react";
 import Select from "react-select";
 import { useAuth } from "@/app/components/AuthContext";
 import { Media, Category } from "@/app/types/types";
-import { apiClient } from "@/app/lib/api";
 import MediaBlock from "../../components/mediaBlock";
 import TextEditor from "../../components/textEditor";
+import { createArticle, getCategories } from "@/app/lib/api";
 
 interface ArticleFormData {
   locale: string;
@@ -20,9 +20,10 @@ interface ArticleFormData {
   category_ids: number[];
 }
 
+
 export default function ArticleForm() {
   const [formData, setFormData] = useState<ArticleFormData>({
-    locale: "om",
+    locale: "am",
     title: "",
     slug: "",
     tag: "primary",
@@ -46,7 +47,7 @@ export default function ArticleForm() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const categoriesData = await apiClient.getCategories();
+        const categoriesData = await getCategories();
         setCategories(categoriesData);
       } catch {
         setError("Failed to load categories");
@@ -78,10 +79,10 @@ export default function ArticleForm() {
     };
 
     try {
-      await apiClient.createArticle(payload);
+      await createArticle(payload);
       setSuccess(true);
       setFormData({
-        locale: "om",
+        locale: "am",
         title: "",
         slug: "",
         tag: "primary",
@@ -118,10 +119,10 @@ export default function ArticleForm() {
     setFormData({ ...formData, title, slug });
   };
 
-  const categoryOptions = categories.map((category) => ({
+  const categoryOptions = [{value:"nnn", label:"kjkk"}]/* categories?.map((category) => ({
     value: category.id,
     label: category.name,
-  }));
+  }));*/
 
   return (
     <div className="mx-auto p-6 rounded-lg shadow-lg w-full bg-white text-black">
@@ -211,7 +212,9 @@ export default function ArticleForm() {
 
         <h1 className="font-semibold text-lg text-gray-800">Content</h1>
         <TextEditor
-          onChange={(json) => setFormData({ ...formData, content: json })}
+          onChange={(json: any) => 
+            setFormData((prev) => ({ ...prev, content: json }))
+          }
         />
 
         <button

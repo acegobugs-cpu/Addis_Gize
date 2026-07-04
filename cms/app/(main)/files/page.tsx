@@ -1,7 +1,7 @@
 "use client";
 
+import { delMedia, getMedia, uploadFile } from "@/app/lib/api";
 import { useState, useEffect } from "react";
-import { apiClient } from "@/app/lib/api";
 
 export default function Media() {
   return (
@@ -25,7 +25,7 @@ function UploadsEditor() {
   useEffect(() => {
     const fetchFiles = async () => {
       try {
-        const response = await apiClient.getMedia(); // This should return {files: string[]}
+        const response = await getMedia(); // This should return {files: string[]}
 
         // Convert the array of URLs to objects
         const filesWithMetadata = response.files.map((fileUrl: string) => {
@@ -55,11 +55,11 @@ function UploadsEditor() {
 
     try {
       setUploading(true);
-      const result = await apiClient.uploadFile(formData);
+      const result = await uploadFile(formData);
       alert("Upload successful: " + result);
 
       // Refresh the files list
-      const response = await apiClient.getMedia();
+      const response = await getMedia();
       const filesWithMetadata = response.files.map((fileUrl: string) => {
         const filename = fileUrl.split("/").pop() || fileUrl;
         return {
@@ -89,7 +89,7 @@ function UploadsEditor() {
         // Extract filename from URL for deletion
         const filename = fileUrl.split("/").pop();
         if (filename) {
-          await apiClient.delMedia(filename);
+          await delMedia(filename);
         }
         // Remove from local state
         setUploadedFiles((prev) => prev.filter((f) => f.url !== fileUrl));

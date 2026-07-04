@@ -4,7 +4,6 @@ import dynamic from "next/dynamic";
 import { useState, useEffect, useRef, useCallback } from "react";
 import Select from "react-select";
 import { EllipsisVerticalIcon } from "@heroicons/react/24/solid";
-import { apiClient } from "@/app/lib/api";
 import { useAuth } from "@/app/components/AuthContext";
 import MediaBlock from "../../components/mediaBlock";
 import MediaRenderer from "../../components/mediaRenderer";
@@ -16,6 +15,7 @@ import {
   ArticleUpdate,
 } from "@/app/types/types";
 import Link from "next/link";
+import { addLocale, deleteArticle, deleteLocale, getArticles, getCategories, updateArticle } from "@/app/lib/api";
 
 const TextEditor = dynamic(() => import("../../components/textEditor"), {
   ssr: false,
@@ -42,7 +42,7 @@ export default function Articles() {
 
   const fetchArticles = async () => {
     try {
-      const data = await apiClient.getArticles();
+      const data = await getArticles();
       setArticles(data);
       setLoading(false);
     } catch (error) {
@@ -54,7 +54,7 @@ export default function Articles() {
 
   const refreshArticles = async () => {
     try {
-      const data = await apiClient.getArticles();
+      const data = await getArticles();
       setArticles(data);
     } catch (error) {
       setError("Failed to refresh articles");
@@ -64,7 +64,7 @@ export default function Articles() {
   const handleDelete = async () => {
     if (!selectedArticle) return;
     try {
-      await apiClient.deleteArticle(selectedArticle.id);
+      await deleteArticle(selectedArticle.id);
       setArticles(
         articles.filter((article) => article.id !== selectedArticle.id),
       );
@@ -292,7 +292,7 @@ function LocaleForm({
 
   const handleSubmit = async () => {
     try {
-      await apiClient.addLocale({
+      await addLocale({
         editor_id: User?.id || 0,
         article_id: article.id,
         locale: formData.locale,
@@ -433,7 +433,7 @@ function EditArticleModal({
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const categoriesData = await apiClient.getCategories();
+        const categoriesData = await getCategories();
         setCategories(categoriesData);
       } catch (err) {
         setError("Failed to load categories");
@@ -489,7 +489,7 @@ function EditArticleModal({
   const handleDeleteTranslation = async (id: number) => {
     if (!id) return;
     try {
-      await apiClient.deleteLocale(id);
+      await deleteLocale(id);
       setFormData((prev) => {
         const { [selectedLocale]: _, ...restTranslations } = prev.translations;
         return { ...prev, translations: restTranslations };
@@ -536,7 +536,7 @@ function EditArticleModal({
         updated_at: new Date().toISOString(),
         translations: translationsDict,
       };
-      await apiClient.updateArticle(article.id, payload);
+      await updateArticle(article.id, payload);
       setSuccess(true);
       await refreshArticles();
       onClose();

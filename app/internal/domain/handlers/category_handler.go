@@ -5,6 +5,9 @@ import (
 
 	"app/internal/domain/services"
 	"app/internal/pkg/errors"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 // CategoryHandler handles category HTTP requests
@@ -46,7 +49,18 @@ func (h *CategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Request)
 
 // GetCategory handles getting a category by ID
 func (h *CategoryHandler) GetCategory(w http.ResponseWriter, r *http.Request) {
-	h.handler.RespondJSON(w, http.StatusOK, map[string]string{"message": "Get category endpoint"})
+	idstr := chi.URLParam(r, "id")
+	id, err := uuid.Parse(idstr)
+	if err != nil {
+		h.handler.RespondError(w, errors.ErrBadRequest)
+	}
+	res, err := h.categoryService.GetCategoryByID(r.Context(), id)
+	if err != nil {
+		h.handler.RespondError(w, err)
+		return
+	}
+
+	h.handler.RespondJSON(w, http.StatusOK, res)
 }
 
 // GetCategoryBySlug handles getting a category by slug

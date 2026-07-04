@@ -106,13 +106,7 @@ class BackendClient {
     if (!response.ok) {
       try {
         const clonedResponse = response.clone();
-        const textPayload = await clonedResponse.text();
-        
-        if (!textPayload || textPayload.trim() === "") {
-          return response;
-        }
-
-        const errorData = JSON.parse(textPayload);
+        const errorData = await clonedResponse.json();
 
         // CASE A: Access Token Expired or Missing (Code: 1001) -> Silent Session Rotation Loop
         if (errorData.statusCode === 1002 && refreshToken) {          

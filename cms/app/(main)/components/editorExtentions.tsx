@@ -16,12 +16,11 @@ export const ArticleTitle = Node.create({
   renderHTML({ HTMLAttributes }) {
     return [
       "h1",
-      { ...HTMLAttributes, "data-title": "" },
-      [
-        mergeAttributes({
-          style: "font-size: 2.5rem;font-weight: 800;",
-        }),
-      ],
+      mergeAttributes(HTMLAttributes, {
+        "data-title": "",
+        style: "font-size: 2.5rem;font-weight: 800;",
+      }),
+      0,
     ];
   },
 });
@@ -40,12 +39,11 @@ export const ArticleDescription = Node.create({
   renderHTML({ HTMLAttributes }) {
     return [
       "p",
-      { ...HTMLAttributes, "data-description": "" },
-      [
-        mergeAttributes({
-          style: "font-size: 1.2rem;color: #555;",
-        }),
-      ],
+      mergeAttributes(HTMLAttributes, {
+        "data-description": "",
+        style: "font-size: 1.2rem;color: #555;",
+      }),
+      0,
     ];
   },
 });
@@ -72,12 +70,11 @@ export const HeadMedia = Node.create({
   renderHTML({ HTMLAttributes }) {
     return [
       "figure",
-      { ...HTMLAttributes, "data-head-media": "" },
-      [
-        mergeAttributes({
-          style: "margin: 20px 0;",
-        }),
-      ],
+      mergeAttributes(HTMLAttributes, {
+        "data-head-media": "",
+        style: "margin: 20px 0;",
+      }),
+      0,
     ];
   },
 });
@@ -192,18 +189,17 @@ export const MediaBlock = Node.create({
       HTMLAttributes;
 
     if (kind === "image") {
-      return [
-        "figure",
-        { "data-media": "image" },
-        ["img", { src, alt }],
-        caption ? ["figcaption", {}, caption] : null,
+      const children: any[] = [
+        ["img", mergeAttributes({ src, alt })],
       ];
+      if (caption) {
+        children.push(["figcaption", {}, caption]);
+      }
+      return ["figure", mergeAttributes({ "data-media": "image" }), children];
     }
 
     if (kind === "video") {
-      return [
-        "figure",
-        { "data-media": "video" },
+      const children: any[] = [
         [
           "video",
           mergeAttributes({
@@ -215,14 +211,15 @@ export const MediaBlock = Node.create({
             style: "width:100%;height:auto;display:block;",
           }),
         ],
-        caption ? ["figcaption", {}, caption] : null,
       ];
+      if (caption) {
+        children.push(["figcaption", {}, caption]);
+      }
+      return ["figure", mergeAttributes({ "data-media": "video" }), children];
     }
 
     if (kind === "embed") {
-      return [
-        "figure",
-        { "data-media": "embed" },
+      const children: any[] = [
         [
           "iframe",
           mergeAttributes({
@@ -232,24 +229,28 @@ export const MediaBlock = Node.create({
             sandbox: "allow-scripts allow-same-origin allow-presentation",
           }),
         ],
-        caption ? ["figcaption", {}, caption] : null,
       ];
+      if (caption) {
+        children.push(["figcaption", {}, caption]);
+      }
+      return ["figure", mergeAttributes({ "data-media": "embed" }), children];
     }
 
     if (kind === "gallery") {
-      return [
-        "figure",
-        { "data-media": "gallery" },
+      const children: any[] = [
         [
           "div",
           { class: "gallery-grid" },
           ...(items || []).map((img: any) => ["img", { src: img.src }]),
         ],
-        caption ? ["figcaption", {}, caption] : null,
       ];
+      if (caption) {
+        children.push(["figcaption", {}, caption]);
+      }
+      return ["figure", mergeAttributes({ "data-media": "gallery" }), children];
     }
 
-    return ["figure", { "data-media": "unknown" }];
+    return ["figure", mergeAttributes({ "data-media": "unknown" }), 0];
   },
 
   addCommands() {

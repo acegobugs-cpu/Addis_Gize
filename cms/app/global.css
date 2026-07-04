@@ -1,47 +1,60 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
 
 @theme {
-  --color-main: #311b65;
-  --color-main-dark: #380654;
+  /* Main Brand Colors */
+  --color-east: hsl(194 100% 40%);
+  --color-west: hsl(120 100% 40%);
+  
+  /* Background Color */
+  --color-canvas: hsl(0 0% 100%);
+  --color-ink: hsl(0 0% 0%);
 
-  --color-custom: #ededed;
-  --color-custom-nav: #fff;
+  /* --- Derived East (Blue) Variants --- */
+  --color-east-light: hsl(194 100% 95%);   /* Soft alert/card background */
+  --color-east-muted: hsl(194 60% 65%);    /* Secondary text / borders */
+  --color-east-hover: hsl(194 100% 30%);   /* Button hover state */
+  --color-east-dark: hsl(194 100% 15%);    /* Deep contrast text */
 
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* --- Derived West (Green) Variants --- */
+  --color-west-light: hsl(120 70% 95%);    /* Success background */
+  --color-west-muted: hsl(120 40% 60%);    /* Subtle success indicators */
+  --color-west-hover: hsl(120 100% 28%);   /* Button hover state */
+  --color-west-dark: hsl(120 100% 12%);    /* Deep green text */
+
+  /* --- Completing the Compass (Cohesive Accents) --- */
+  /* "North" - A cool slate to bridge East and Neutral */
+  --color-north: hsl(210 20% 50%);
+  --color-north-light: hsl(210 20% 96%);
+  --color-north-dark: hsl(210 25% 12%);
+
+  /* "South" - A vibrant coral/orange to contrast the cool East & green West */
+  --color-south: hsl(14 100% 57%);
+  --color-south-light: hsl(14 100% 96%);
+  --color-south-hover: hsl(14 90% 45%);
+
+  /* --- UI Neutrals (Derived from Ink/Canvas) --- */
+  --color-surface: hsl(0 0% 97%);          /* App/Card background */
+  --color-border: hsl(0 0% 88%);           /* Subtle dividers */
+  --color-muted: hsl(0 0% 45%);            /* Captions and secondary text */
 }
 
-@media (prefers-color-scheme: dark) {
+:root {
+    --background: var(--color-canvas);
+    --foreground: var(--color-ink);
+  }
+
+/* @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
   }
-}
+} */
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--color-canvas);
+  color: var(--color-ink);
   font-family: Arial, Helvetica, sans-serif;
 }
 
-h1[data-title] {
-  font-size: 2.5rem;
-  font-weight: 800;
-}
-
-p[data-description] {
-  font-size: 1.2rem;
-  color: #555;
-}
-
-figure[data-head-media] {
-  margin: 20px 0;
-}

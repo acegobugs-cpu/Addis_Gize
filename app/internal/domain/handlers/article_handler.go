@@ -98,10 +98,29 @@ func (h *ArticleHandler) DeleteArticle(w http.ResponseWriter, r *http.Request) {
 
 // ListArticles handles listing all articles
 func (h *ArticleHandler) ListArticles(w http.ResponseWriter, r *http.Request) {
-	h.handler.RespondJSON(w, http.StatusOK, map[string]string{"message": "List articles endpoint"})
+	ctx := r.Context()
+	res, err := h.articleService.ListArticles(ctx, 10, 0) // Example: limit=10, offset=0
+	if err != nil {
+		h.handler.RespondError(w, err)
+		return
+	}
+
+	h.handler.RespondJSON(w, http.StatusOK, res)
 }
 
 // SearchArticles handles searching articles
 func (h *ArticleHandler) SearchArticles(w http.ResponseWriter, r *http.Request) {
-	h.handler.RespondJSON(w, http.StatusOK, map[string]string{"message": "Search articles endpoint"})
+	ctx := r.Context()
+	query := r.URL.Query().Get("q")
+	if query == "" {
+		h.handler.RespondError(w, errors.ErrInvalidInput.W("Missing search query", ""))
+		return
+	}
+	res, err := h.articleService.SearchArticles(ctx, query, 10, 0) // Example: limit=10, offset=0
+	if err != nil {
+		h.handler.RespondError(w, err)
+		return
+	}
+
+	h.handler.RespondJSON(w, http.StatusOK, res)
 }

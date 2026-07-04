@@ -1,5 +1,7 @@
-// lib/api.ts
+"use server";
 
+// 1. Import your advanced BackendClient instance 
+import { client as backend } from "./client"; // Adjust path to your BackendClient file
 import {
   LoginData,
   RegisterData,
@@ -13,227 +15,199 @@ import {
   Invite,
 } from "../types/types";
 
-class ApiClient {
-  private baseURL: string;
-
-  constructor() {
-    // this.baseURL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
-    this.baseURL = ""; // Use proxy endpoint
-  }
-
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {},
-  ): Promise<T> {
-    // const url = `${this.baseURL}${endpoint}`;
-    const url = `/api/proxy${endpoint}`;
-    const isFormData = options.body instanceof FormData;
-
-    const config: RequestInit = {
-      ...options,
-      credentials: "include", // This is correct
-    };
-
-    if (!isFormData) {
-      config.headers = {
-        "Content-Type": "application/json",
-        ...options.headers,
-      };
-    } else {
-      // For FormData, keep any headers passed in options
-      config.headers = options.headers;
-    }
-
+/**
+ * Helper utility to process response payloads uniformly.
+ * Server Actions return data directly to the client components.
+ */
+async function handleResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    let message = `HTTP error! status: ${response.status}`;
     try {
-      const response = await fetch(url, config);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      if (response.status === 204) {
-        return {} as T;
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error("API request failed:", error);
-      throw error;
+      const body = await response.json();
+      if (body?.message) message = body.message;
+    } catch {
+      // ignore non-JSON error bodies
     }
+    throw new Error(message);
   }
-
-  // Auth API
-  async loginUser(
-    email_or_username: string,
-    password: string,
-  ): Promise<{ email_or_username: string; password: string }> {
-    return this.request<{ email_or_username: string; password: string }>(
-      "/api/v1/auth/login",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          email_or_username,
-          password,
-        }),
-      },
-    );
+  if (response.status === 204) {
+    return {} as T;
   }
-
-  async registerUser(slug: string, data: RegisterData): Promise<AuthResponse> {
-    return this.request<AuthResponse>(`/api/v1/auth/register/${slug}`, {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-  }
-
-  // Email API
-  async invite(data: {
-    firstName: string;
-    middleName?: string;
-    lastName: string;
-    email: string;
-    phone: string;
-    roleIds: string[];
-  }) {
-    return this.request<Invite>("/api/v1/users/invite", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-  }
-
-  async getInvites() {
-    return this.request<{success: boolean, statusCode: number, data:Invite[]}>("/api/v1/users/invites");
-  }
-
-  async deleteEmails(id: string) {
-    return this.request(`/api/v1/authorize-emails/${id}`, {
-      method: "DELETE",
-    });
-  }
-
-  // Users API
-  async getUsers() {
-    return this.request<User[]>("/api/v1/users");
-  }
-
-  async deleteUser(id: number) {
-    return this.request(`/api/v1/users/${id}`, {
-      method: "DELETE",
-    });
-  }
-
-  async updateUser(id: number, data: Partial<User>) {
-    return this.request<User>(`/api/v1/users/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
-    });
-  }
-
-  // Articles API
-  async getArticles() {
-    return this.request<Article[]>("/api/v1/articles");
-  }
-
-  async getArticleById(id: string) {
-    return this.request<Article>(`/api/v1/articles/${id}`);
-  }
-
-  async getArticleBySlug(slug: string) {
-    return this.request<Article>(`/api/v1/articles/slug/${slug}`);
-  }
-
-  async createArticle(data: Partial<Article>) {
-    return this.request<Article>("/api/v1/articles", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-  }
-
-  async updateArticle(article_id: number, data: Partial<ArticleUpdate>) {
-    return this.request<ArticleUpdate>(`/api/v1/articles/${article_id}`, {
-      method: "PATCH",
-      body: JSON.stringify(data),
-    });
-  }
-
-  async deleteArticle(id: number) {
-    return this.request(`/api/v1/articles/${id}`, {
-      method: "DELETE",
-    });
-  }
-
-  //Locale API
-  async addLocale(data: Partial<ArticleTranslation>) {
-    return this.request<ArticleTranslation>("/api/v1/locale", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-  }
-
-  async deleteLocale(id: number) {
-    return this.request(`/api/v1/delete/locale/${id}`, {
-      method: "DELETE",
-    });
-  }
-
-  // Categories API
-  async getCategories() {
-    return this.request<Category[]>("/api/v1/categories");
-  }
-
-  async getCategoryById(id: string) {
-    return this.request<Category>(`/api/v1/categories/${id}`);
-  }
-
-  async getCategoryBySlug(slug: string) {
-    return this.request<Category>(`/api/v1/categories/slug/${slug}`);
-  }
-
-  async getArticlesByCategory(categoryId: string) {
-    return this.request<Article[]>(`/api/v1/articles/category/${categoryId}`);
-  }
-
-  async getCategoriesByArticle(articleId: string) {
-    return this.request<Category[]>(`/api/v1/categories/article/${articleId}`);
-  }
-
-  async createCategory(data: Partial<Category>) {
-    return this.request<Category>("/api/v1/categories", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-  }
-
-  async updateCategory(id: number, data: Partial<Category>) {
-    return this.request<Category>(`/api/v1/categories/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
-    });
-  }
-
-  async deleteCategory(id: number) {
-    return this.request(`/api/v1/categories/${id}`, {
-      method: "DELETE",
-    });
-  }
-
-  // Media API
-  async getMedia() {
-    return this.request<{ files: string[] }>("/api/v1/uploads");
-  }
-
-  async delMedia(filename: string) {
-    return this.request(`/api/v1/upload/${filename}`, {
-      method: "DELETE",
-    });
-  }
-
-  async uploadFile(formData: FormData) {
-    return this.request(`/api/v1/upload`, {
-      method: "POST",
-      body: formData,
-    });
-  }
+  return (await response.json()) || [];
 }
 
-export const apiClient = new ApiClient();
+// ==========================================
+// AUTH ACTIONS
+// ==========================================
+
+// export async function loginUser(email_or_username: string, password: string) {
+//   const res = await backend.post("/auth/login", { email_or_username, password });
+//   return handleResponse<{ email_or_username: string; password: string }>(res);
+// }
+
+// export async function registerUser(slug: string, data: RegisterData) {
+//   const res = await backend.post(`/auth/register/${slug}`, data);
+//   return handleResponse<AuthResponse>(res);
+// }
+
+// ==========================================
+// INVITE / EMAIL ACTIONS
+// ==========================================
+
+export async function invite(data: {
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  roleIds: string[];
+}) {
+  const res = await backend.post("/users/invite", data);
+  return handleResponse<Invite>(res);
+}
+
+export async function getInvites() {
+  const res = await backend.get("/users/invites");
+  return handleResponse<{ success: boolean; statusCode: number; data: Invite[] }>(res);
+}
+
+export async function deleteEmails(id: string) {
+  const res = await backend.delete(`/authorize-emails/${id}`);
+  return handleResponse<any>(res);
+}
+
+// ==========================================
+// USERS ACTIONS
+// ==========================================
+
+export async function getUsers() {
+  const res = await backend.get("/users");
+  return handleResponse<User[]>(res);
+}
+
+export async function deleteUser(id: number) {
+  const res = await backend.delete(`/users/${id}`);
+  return handleResponse<any>(res);
+}
+
+export async function updateUser(id: number, data: Partial<User>) {
+  const res = await backend.put(`/users/${id}`, data);
+  return handleResponse<User>(res);
+}
+
+// ==========================================
+// ARTICLES ACTIONS
+// ==========================================
+
+export async function getArticles() {
+  const res = await backend.get("/articles");
+  return handleResponse<Article[]>(res);
+}
+
+export async function getArticleById(id: string) {
+  const res = await backend.get(`/articles/${id}`);
+  return handleResponse<Article>(res);
+}
+
+export async function getArticleBySlug(slug: string) {
+  const res = await backend.get(`/articles/slug/${slug}`);
+  return handleResponse<Article>(res);
+}
+
+export async function createArticle(data: Partial<Article>) {
+  const res = await backend.post("/articles", data);
+  return handleResponse<Article>(res);
+}
+
+export async function updateArticle(article_id: number, data: Partial<ArticleUpdate>) {
+  const res = await backend.patch(`/articles/${article_id}`, data);
+  return handleResponse<ArticleUpdate>(res);
+}
+
+export async function deleteArticle(id: number) {
+  const res = await backend.delete(`/articles/${id}`);
+  return handleResponse<any>(res);
+}
+
+// ==========================================
+// LOCALE ACTIONS
+// ==========================================
+
+export async function addLocale(data: Partial<ArticleTranslation>) {
+  const res = await backend.post("/locale", data);
+  return handleResponse<ArticleTranslation>(res);
+}
+
+export async function deleteLocale(id: number) {
+  const res = await backend.delete(`/delete/locale/${id}`);
+  return handleResponse<any>(res);
+}
+
+// ==========================================
+// CATEGORIES ACTIONS
+// ==========================================
+
+export async function getCategories() {
+  const res = await backend.get("/categories");
+  return handleResponse<Category[]>(res);
+}
+
+export async function getCategoryById(id: string) {
+  const res = await backend.get(`/categories/${id}`);
+  return handleResponse<Category>(res);
+}
+
+export async function getCategoryBySlug(slug: string) {
+  const res = await backend.get(`/categories/slug/${slug}`);
+  return handleResponse<Category>(res);
+}
+
+export async function getArticlesByCategory(categoryId: string) {
+  const res = await backend.get(`/articles/category/${categoryId}`);
+  return handleResponse<Article[]>(res);
+}
+
+export async function getCategoriesByArticle(articleId: string) {
+  const res = await backend.get(`/categories/article/${articleId}`);
+  return handleResponse<Category[]>(res);
+}
+
+export async function createCategory(data: Partial<Category>) {
+  const res = await backend.post("/categories", data);
+  return handleResponse<Category>(res);
+}
+
+export async function updateCategory(id: number, data: Partial<Category>) {
+  const res = await backend.put(`/categories/${id}`, data);
+  return handleResponse<Category>(res);
+}
+
+export async function deleteCategory(id: number) {
+  const res = await backend.delete(`/categories/${id}`);
+  return handleResponse<any>(res);
+}
+
+// ==========================================
+// MEDIA ACTIONS
+// ==========================================
+
+export async function getMedia() {
+  const res = await backend.get("/uploads");
+  return handleResponse<{ files: string[] }>(res);
+}
+
+export async function delMedia(filename: string) {
+  const res = await backend.delete(`/upload/${filename}`);
+  return handleResponse<any>(res);
+}
+
+/**
+ * Advanced Note on FormData handling:
+ * Next.js Server Actions automatically parse multi-part FormData natively.
+ * We pass the formData directly as options to client.post().
+ */
+export async function uploadFile(formData: FormData) {
+  // Since BackendClient post takes (path, body, options), pass formData via custom options boundary
+  const res = await backend.post("/upload", undefined, { body: formData });
+  return handleResponse<any>(res);
+}

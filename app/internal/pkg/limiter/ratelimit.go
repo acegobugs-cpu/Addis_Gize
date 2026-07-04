@@ -13,7 +13,6 @@ import (
 
 type Limiter struct {
 	GlobalRateLimit func(http.Handler) http.Handler
-	Refresh         func(http.Handler) http.Handler
 	Register        func(http.Handler) http.Handler
 	AuthGroup       func(http.Handler) http.Handler
 	Login           func(http.Handler) http.Handler
@@ -51,13 +50,6 @@ func NewLimiter(redisClient *redis.Client, cfg *config.Config) *Limiter {
 
 		Login: httprate.Limit(
 			cfg.RateLimit.LoginRequestsPerMinute,
-			1*time.Minute,
-			httprate.WithKeyFuncs(httprate.KeyByRealIP),
-			httprateredis.WithRedisLimitCounter(redisOptions),
-		),
-
-		Refresh: httprate.Limit(
-			cfg.RateLimit.RefreshRequestsPerMinute,
 			1*time.Minute,
 			httprate.WithKeyFuncs(httprate.KeyByRealIP),
 			httprateredis.WithRedisLimitCounter(redisOptions),

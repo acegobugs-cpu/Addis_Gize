@@ -44,21 +44,21 @@ export default function Nav() {
   }, []);
 
   return (
-    <header className="absolute top-0 w-full h-14 backdrop-blur-md bg-white border-b border-red-200 flex items-center justify-between z-50 pl-6 pr-6 text-[#311B65]">
+    <header className="sticky top-0 w-full h-14 backdrop-blur-md bg-white border-b border-border flex items-center justify-between z-50 pl-6 pr-6 text-[#311B65]">
       {/* Left */}
       <div className="flex items-center gap-6">
-        <div className="hidden sm:flex items-center px-3 py-1.5 bg-gray-50 border border-red-200 rounded-md hover:border-red-300 transition-all">
+        <div className="hidden sm:flex items-center px-3 py-1.5 bg-surface border border-east rounded-md hover:border-west transition-all">
           <Search size={16} className="" />
           <input
             type="search"
             placeholder="Search news..."
-            className="bg-transparent outline-none px-2 text-sm focus:placeholder-gray-400 w-40 md:w-64"
+            className="bg-transparent outline-none px-2 text-sm focus:placeholder-west w-40 md:w-64"
           />
         </div>
       </div>
 
       {/* Right */}
-      <div className="flex items-center gap-3">
+      <div className="flex h-full items-center gap-3 ">
         <div className="flex items-center gap-1.5">
           <button
             className="p-2 rounded hover:bg-gray-100 transition-all"
@@ -81,17 +81,17 @@ export default function Nav() {
           </Link>
         </div>
 
-        <div className="relative flex items-center gap-3 border-l border-red-200 pl-4">
+        <div className="h-full flex items-center gap-3 border-l border-west pl-6">
           <button
             type="button"
             className="flex items-center gap-3"
             onClick={() => setIsUserMenuOpen((v) => !v)}
           >
-            <div className="h-8 w-8 rounded-full bg-[#311B65] flex items-center justify-center text-white text-sm font-medium">
+            <div className="h-8 w-8 rounded-full bg-west flex items-center justify-center text-canvas text-sm font-medium">
               A
             </div>
             <div className="hidden md:flex flex-col items-start">
-              <p className="text-sm font-medium text-gray-900">
+              <p className="text-sm font-medium">
                 {user ? user.username : "Guest"}
               </p>
               <p className="text-xs">{user ? user.email : ""}</p>
@@ -158,7 +158,7 @@ function Dropdown({ isOpen, setIsUserMenuOpen }: DropdownProps) {
   return (
     <div
       role="menu"
-      className={`absolute top-[calc(100%+6px)] right-0 w-52 sm:w-60 p-2 bg-[var(--background-block)] backdrop-blur border border-[var(--border-light)] rounded-xl shadow-xl z-50 max-h-[70vh] overflow-hidden transition-all duration-150 origin-top-right ${
+      className={`top-[calc(100%+6px)] right-0 w-52 sm:w-60 p-2 bg-[var(--background-block)] backdrop-blur border border-[var(--border-light)] rounded-xl shadow-xl z-50 max-h-[70vh] overflow-hidden transition-all duration-150 origin-top-right ${
         isOpen
           ? "opacity-100 scale-100 pointer-events-auto"
           : "opacity-0 scale-95 pointer-events-none"

@@ -96,12 +96,9 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 // Login handles user login
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		EmailOrUsername string `json:"email_or_username"`
-		Password        string `json:"password"`
-	}
-	if err := h.handler.ParseJSON(r, &req); err != nil {
-		h.handler.RespondError(w, errors.ErrInvalidInput)
+	req, ok := r.Context().Value(ValidatedBodyKey).(LoginRequest)
+	if !ok {
+		h.handler.RespondError(w, errors.ErrInternalServer.W("Failed to validate request", ""))
 		return
 	}
 

@@ -31,7 +31,6 @@ import {
   TextAlignJustify,
   UnderlineIcon,
 } from "lucide-react";
-import { apiClient } from "@/app/lib/api";
 import {
   MediaBlock,
   FontSize,
@@ -40,10 +39,11 @@ import {
   ArticleDescription,
   HeadMedia,
 } from "./editorExtentions";
+import { getMedia, uploadFile } from "@/app/lib/api";
 
 interface EditorProps {
-  onChange?: (content: any) => void;
   initialValue?: any;
+  onChange?: (json: any) => void;
 }
 
 interface CustomVideoAttributes {
@@ -67,8 +67,8 @@ declare module "@tiptap/core" {
 }
 
 export default function TextEditor({
-  onChange,
   initialValue = {},
+  onChange,
 }: EditorProps) {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showHeadingMenu, setShowHeadingMenu] = useState(false);
@@ -684,7 +684,7 @@ export function MediaWindow({ editor, onClose }: Props) {
   useEffect(() => {
     const fetchUploadedFiles = async () => {
       try {
-        const mediaFiles = await apiClient.getMedia();
+        const mediaFiles = await getMedia();
         setMedia(mediaFiles.files.map((file) => file));
       } catch (error) {
         console.error("Failed to fetch uploaded files:", error);
@@ -733,7 +733,7 @@ export function MediaWindow({ editor, onClose }: Props) {
     form.append("type", "image");
     form.append("source", "user");
 
-    const result: any = await apiClient.uploadFile(form);
+    const result: any = await uploadFile(form);
 
     const data = await result.json();
 

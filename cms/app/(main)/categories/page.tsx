@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiClient } from "@/app/lib/api";
 import { Category } from "@/app/types/types";
+import { createCategory, deleteCategory, getCategories, updateCategory } from "@/app/lib/api";
 
 interface CategoryFormData {
   name: string;
@@ -23,7 +23,7 @@ export default function Categories() {
 
   const fetchCategories = async () => {
     try {
-      const categoriesData = await apiClient.getCategories();
+      const categoriesData = await getCategories();
       setCategories(categoriesData);
     } catch (error) {
       console.error("Error fetching categories:", error);
@@ -39,7 +39,7 @@ export default function Categories() {
 
   const handleUpdate = async (id: number) => {
     try {
-      await apiClient.updateCategory(id, form);
+      await updateCategory(id, form);
       const updated = categories.map((cat) =>
         cat.id === id ? { ...cat, ...form } : cat
       );
@@ -54,7 +54,7 @@ export default function Categories() {
 
   const handleDelete = async (id: number) => {
     try {
-      await apiClient.deleteCategory(id);
+      await deleteCategory(id);
       setCategories(categories.filter((cat) => cat.id !== id));
       setError(null);
     } catch (error) {
@@ -79,7 +79,7 @@ export default function Categories() {
       return;
     }
     try {
-      await apiClient.createCategory(form);
+      await createCategory(form);
       setSuccess(true);
       setForm({ name: "", slug: "" });
       setError(null);

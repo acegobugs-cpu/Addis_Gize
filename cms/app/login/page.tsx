@@ -63,73 +63,78 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
-      {/* Background */}
-      <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#311B65] via-[#311B65]/95 to-[#1e1142]"></div>
-        <div className="absolute inset-0 opacity-20 bg-[url('https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&q=80&w=2000')] bg-cover bg-center mix-blend-overlay"></div>
-        <div className="absolute inset-0 bg-black/30"></div>
-      </div>
-
-      {/* Card */}
-      <div className="relative z-10 w-full max-w-md p-10 rounded-2xl shadow-2xl bg-white/95 backdrop-blur-sm border border-white/10">
-        <h1 className="text-4xl font-bold text-center mb-8 text-[#311B65] tracking-tight">
-          Prime Media
-        </h1>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <input
-              type="text"
-              name="email_or_username"
-              placeholder="Username or Email"
-              value={form.email_or_username}
-              onChange={handleChange}
-              required
-              className="w-full px-5 py-4 rounded-xl border border-gray-300 focus:border-[#311B65] focus:ring-2 focus:ring-[#311B65]/30 bg-white/80 transition-all duration-200 text-gray-900 placeholder-gray-500 text-lg"
-              disabled={isLoading}
-            />
-          </div>
-
-          <div className="relative">
-            <input
-              type={showPassword ? "text" : "password"}
-              name="password"
-              placeholder="Password"
-              value={form.password}
-              onChange={handleChange}
-              required
-              className="w-full px-5 py-4 rounded-xl border border-gray-300 focus:border-[#311B65] focus:ring-2 focus:ring-[#311B65]/30 bg-white/80 transition-all duration-200 text-gray-900 placeholder-gray-500 text-lg"
-              disabled={isLoading}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              aria-label={showPassword ? "Hide password" : "Show password"}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-[#311B65] transition-colors"
-            >
-              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-            </button>
-          </div>
-
-          {error && (
-            <p className="text-red-600/90 text-sm text-center font-medium bg-red-50/80 py-2 rounded-lg">
-              {error}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-[#311B65] text-white py-4 px-6 rounded-xl text-lg font-semibold hover:bg-[#3c2478] focus:ring-4 focus:ring-[#311B65]/40 disabled:opacity-60 transition-all duration-200 shadow-md hover:shadow-lg"
-          >
-            {isLoading ? "Signing in..." : "Sign In"}
-          </button>
-        </form>
-
-        {/* Subtle accent line */}
-        <div className="mt-8 h-1 bg-gradient-to-r from-transparent via-red-400/40 to-transparent rounded-full max-w-[180px] mx-auto"></div>
-      </div>
+  <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
+    {/* Background */}
+    <div className="absolute inset-0 z-0">
+      {/* Replaced hardcoded purple gradient with a deep East-to-North-dark gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-east-dark via-east-dark/95 to-north-dark"></div>
+      <div className="absolute inset-0 opacity-20 bg-[url('https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&q=80&w=2000')] bg-cover bg-center mix-blend-overlay"></div>
+      <div className="absolute inset-0 bg-ink/30"></div>
     </div>
-  );
+
+    {/* Card */}
+    {/* Replaced white/95 with canvas/95, border with border token */}
+    <div className="relative z-10 w-full max-w-md p-10 rounded-2xl shadow-2xl bg-canvas/95 backdrop-blur-sm border border-border/50">
+      {/* Brand title now uses main brand color (East) */}
+      <h1 className="text-4xl font-bold text-center mb-8 text-west tracking-tight">
+        Prime Media
+      </h1>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div>
+          <input
+            type="text"
+            name="email_or_username"
+            placeholder="Username or Email"
+            value={form.email_or_username}
+            onChange={handleChange}
+            required
+            className="w-full px-5 py-4 rounded-xl border border-border focus:border-east focus:ring-2 focus:ring-east/30 bg-canvas/80 transition-all duration-200 text-ink placeholder-muted text-lg"
+            disabled={isLoading}
+          />
+        </div>
+
+        <div className="relative">
+          <input
+            type={showPassword ? "text" : "password"}
+            name="password"
+            placeholder="Password"
+            value={form.password}
+            onChange={handleChange}
+            required
+            className="w-full px-5 py-4 rounded-xl border border-border focus:border-east focus:ring-2 focus:ring-east/30 bg-canvas/80 transition-all duration-200 text-ink placeholder-muted text-lg"
+            disabled={isLoading}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-muted hover:text-east transition-colors"
+          >
+            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+          </button>
+        </div>
+
+        {/* Error State uses the new warm/destructive "South" tokens */}
+        {error && (
+          <p className="text-south text-sm text-center font-medium bg-south-light/80 py-2 rounded-lg border border-south/20">
+            {error}
+          </p>
+        )}
+
+        {/* Submit button uses East, East-hover, and East-focused rings */}
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="w-full bg-east text-canvas py-4 px-6 rounded-xl text-lg font-semibold hover:bg-east-hover focus:ring-4 focus:ring-east/40 disabled:opacity-60 transition-all duration-200 shadow-md hover:shadow-lg"
+        >
+          {isLoading ? "Signing in..." : "Sign In"}
+        </button>
+      </form>
+
+      {/* Subtle accent line gracefully shifting from East (Blue) to West (Green) */}
+      <div className="mt-8 h-1 bg-gradient-to-r from-transparent via-west/40 to-transparent rounded-full max-w-[180px] mx-auto"></div>
+    </div>
+  </div>
+);
 }
