@@ -32,12 +32,12 @@ func NewAuthHandler(authService *services.AuthService, cfg *config.Config) *Auth
 
 // RegisterRequest represents a user registration request
 type SigninRequest struct {
-	FirstName string `json:"fname"`
-	LastName  string `json:"lname"`
-	Username  string `json:"uname"`
-	Email     string `json:"email"`
-	Phone     string `json:"phone"`
-	Password  string `json:"password"`
+	FirstName string `json:"first_name" validate:"required,min=2,max=50"`
+	LastName  string `json:"last_name" validate:"required,min=2,max=50"`
+	Username  string `json:"username" validate:"required,alphanum,min=3,max=30"`
+	Email     string `json:"email" validate:"required,email"`
+	Phone     string `json:"phone" validate:"required,e164"` // Validates international format
+	Password  string `json:"password" validate:"required,min=8"`
 }
 
 // LoginRequest represents a login request
@@ -46,38 +46,16 @@ type LoginRequest struct {
 	Password        string `json:"password"`
 }
 
-// RefreshTokenRequest represents a refresh token request
-type RefreshTokenRequest struct {
-	RefreshToken string `json:"refresh_token"`
-}
-
 type UserResponse struct {
 	ID       uuid.UUID `json:"id"`
 	Username string    `json:"username"`
 	Email    string    `json:"email"`
 }
 
-// ValidateInvitationRequest represents a request to validate an invitation token
-type ValidateInvitationRequest struct {
-	Token string `json:"token"`
-}
-
 func (h *AuthHandler) GetPendingInvitation(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Support both GET (for backward compatibility) and POST (recommended)
-	var token string
-	if r.Method == http.MethodPost {
-		var req ValidateInvitationRequest
-		if err := h.handler.ParseJSON(r, &req); err != nil {
-			h.handler.RespondError(w, errors.ErrInvalidInput)
-			return
-		}
-		token = req.Token
-	} else {
-		token = r.URL.Query().Get("token")
-	}
-
+	token := r.URL.Query().Get("token")
 	if token == "" {
 		http.Error(w, "token is required", http.StatusBadRequest)
 		return
@@ -95,9 +73,9 @@ func (h *AuthHandler) GetPendingInvitation(w http.ResponseWriter, r *http.Reques
 
 // Register handles user registration
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
-	var req SigninRequest
-	if err := h.handler.ParseJSON(r, &req); err != nil {
-		h.handler.RespondError(w, errors.ErrInvalidInput)
+	req, ok := r.Context().Value(ValidatedBodyKey).(SigninRequest)
+	if !ok {
+		h.handler.RespondError(w, errors.ErrInternalServer.W("Failed to validate request", ""))
 		return
 	}
 
@@ -139,23 +117,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "access_token",
-		Value:    tokens.AccessToken,
-		Path:     "/",
-		HttpOnly: true, // Hide from malicious client scripts
-		Secure:   h.config.Server.Environment == "production",
-		SameSite: http.SameSiteLaxMode,
-	})
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     "refresh_token",
-		Value:    tokens.RefreshToken,
-		Path:     "/",
-		HttpOnly: true, // Hide from malicious client scripts
-		Secure:   h.config.Server.Environment == "production",
-		SameSite: http.SameSiteLaxMode,
-	})
+	h.setAuthCookies(w, tokens.AccessToken, tokens.RefreshToken)
 
 	res := UserResponse{
 		ID:       user.ID,
@@ -195,40 +157,67 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-// RefreshToken handles refreshing an access token
+// RefreshToken handles refreshing an access token via HttpOnly cookies
 func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
-	var req RefreshTokenRequest
-	if err := h.handler.ParseJSON(r, &req); err != nil {
-		h.handler.RespondError(w, errors.ErrInvalidInput)
+	// 1. Extract the refresh token directly from the HttpOnly cookies
+	cookie, err := r.Cookie("refresh_token")
+	if err != nil {
+		// Missing cookie means they aren't authenticated or session expired
+		h.handler.RespondError(w, errors.ErrUnauthorized.W("Missing refresh token cookie", ""))
 		return
 	}
+	refreshToken := cookie.Value
 
-	// 1. Extract the User-Agent header
+	// 2. Extract metadata for session tracking/security logs
 	userAgent := r.Header.Get("User-Agent")
-	// 2. Extract the IP Address (taking proxies/load balancers into account)
 	ipAddress := h.readUserIP(r)
 
-	tokens, err := h.authService.RefreshAccessToken(r.Context(), req.RefreshToken, userAgent, ipAddress)
+	// 3. Pass the extracted string token into your business layer
+	tokens, err := h.authService.RefreshAccessToken(r.Context(), refreshToken, userAgent, ipAddress)
 	if err != nil {
 		h.handler.RespondError(w, err)
 		return
 	}
 
-	h.handler.RespondJSON(w, http.StatusOK, tokens)
+	h.setAuthCookies(w, tokens.AccessToken, tokens.RefreshToken)
+
+	h.handler.RespondJSON(w, http.StatusOK, map[string]string{"message": "Tokens refreshed successfully"})
 }
 
-// Logout handles user logout
+// Logout handles user logout by invalidating the database session and wiping the cookie
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	var req RefreshTokenRequest
-	if err := h.handler.ParseJSON(r, &req); err != nil {
-		h.handler.RespondError(w, errors.ErrInvalidInput)
-		return
+	var accessToken string
+	var refreshToken string
+
+	// 1. Try to extract Access Token from the Bearer Header first
+	authHeader := r.Header.Get("Authorization")
+	if strings.HasPrefix(authHeader, "Bearer ") {
+		accessToken = strings.TrimPrefix(authHeader, "Bearer ")
 	}
 
-	if err := h.authService.Logout(r.Context(), req.RefreshToken); err != nil {
-		h.handler.RespondError(w, err)
-		return
+	// 2. Fallback: Try to read Access Token from Cookie if header is missing
+	if accessToken == "" {
+		if atCookie, err := r.Cookie("access_token"); err == nil {
+			accessToken = atCookie.Value
+		}
 	}
+
+	// 3. Extract the Refresh Token from Cookies
+	if rtCookie, err := r.Cookie("refresh_token"); err == nil {
+		refreshToken = rtCookie.Value
+	}
+
+	// 4. Backend Cleanup: Invalidate the tokens in your database/Redis
+	if refreshToken != "" {
+		_ = h.authService.Logout(r.Context(), refreshToken)
+	}
+	if accessToken != "" {
+		// Optional: If you maintain an access token denylist
+		// _ = h.authService.DenylistAccessToken(r.Context(), accessToken)
+	}
+
+	// 5. Hard Eviction: Force the browser to delete BOTH cookies
+	h.clearAuthCookies(w)
 
 	h.handler.RespondJSON(w, http.StatusOK, map[string]string{"message": "Logged out successfully"})
 }
@@ -246,61 +235,109 @@ func (h *AuthHandler) LogoutAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.clearAuthCookies(w)
+
 	h.handler.RespondJSON(w, http.StatusOK, map[string]string{"message": "Logged out from all devices"})
 }
 
-// VerifyToken handles token verification
-func (h *AuthHandler) VerifyToken(w http.ResponseWriter, r *http.Request) {
-	// 1. Extract Bearer Token from Authorization Header
-	cookie, err := r.Cookie("access_token")
+func (h *AuthHandler) readUserIP(r *http.Request) string {
+	// 1. Extract and parse the raw TCP connection IP address
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		h.handler.RespondError(w, errors.ErrUnauthorized)
-		return
-	}
-	accessToken := cookie.Value
-
-	claims, err := h.authService.ValidateAccessToken(accessToken)
-	if err != nil {
-		h.handler.RespondError(w, err)
-		return
+		host = r.RemoteAddr
 	}
 
-	h.handler.RespondJSON(w, http.StatusOK, claims)
+	directIP := net.ParseIP(strings.TrimSpace(host))
+	if directIP == nil {
+		return host // Fallback to raw string if completely unparseable
+	}
+
+	// 2. If the direct upstream load balancer isn't even trusted, stop immediately.
+	if !h.config.IsTrustedProxy(directIP) {
+		return directIP.String()
+	}
+
+	// 3. Process X-Forwarded-For sequentially from right to left
+	xff := r.Header.Get("X-Forwarded-For")
+	if xff != "" {
+		parts := strings.Split(xff, ",")
+
+		// This tracks our active cursor across the proxy chain topology
+		currentTrustedProxy := directIP
+
+		for i := len(parts) - 1; i >= 0; i-- {
+			candidateIP := net.ParseIP(strings.TrimSpace(parts[i]))
+			if candidateIP == nil {
+				// Skip malformed entries injected by attackers
+				break
+			}
+
+			// If the current step in the chain was reached via a trusted proxy,
+			// evaluate if this candidate is *also* a proxy or the client.
+			if h.config.IsTrustedProxy(currentTrustedProxy) {
+				if !h.config.IsTrustedProxy(candidateIP) {
+					// Trust chain breaks here: client's actual external IP.
+					return candidateIP.String()
+				}
+				// Another trusted proxy; keep moving left.
+				currentTrustedProxy = candidateIP
+			}
+		}
+
+		// If the entire chain was composed of trusted proxies, return the leftmost one
+		if len(parts) > 0 {
+			if leftmostIP := net.ParseIP(strings.TrimSpace(parts[0])); leftmostIP != nil {
+				return leftmostIP.String()
+			}
+		}
+	}
+
+	// 4. Fallback to X-Real-IP if XFF was missing or inconclusive
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		if ip := net.ParseIP(strings.TrimSpace(xri)); ip != nil {
+			return ip.String()
+		}
+	}
+
+	return directIP.String()
 }
 
-func (h *AuthHandler) readUserIP(r *http.Request) string {
-	// Get the direct connection IP
-	directIP, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		directIP = r.RemoteAddr
+func (h *AuthHandler) setAuthCookies(w http.ResponseWriter, accessToken, refreshToken string) {
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "access_token",
+		Value:    accessToken,
+		Path:     "/",
+		MaxAge:   int(h.config.JWT.AccessDuration.Seconds()),
+		HttpOnly: true,
+		Secure:   h.config.Server.Environment == "production",
+		SameSite: http.SameSiteStrictMode,
+	})
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    refreshToken,
+		Path:     "/",
+		MaxAge:   int(h.config.JWT.RefreshDuration.Seconds()),
+		HttpOnly: true,
+		Secure:   h.config.Server.Environment == "production",
+		SameSite: http.SameSiteStrictMode,
+	})
+
+}
+
+func (h *AuthHandler) clearAuthCookies(w http.ResponseWriter) {
+	cookieSettings := []string{"access_token", "refresh_token"}
+
+	for _, name := range cookieSettings {
+		http.SetCookie(w, &http.Cookie{
+			Name:     name,
+			Value:    "",
+			Path:     "/", // Must exactly match the path configuration used when setting them
+			MaxAge:   -1,  // Tells the browser to delete the cookie instantly
+			HttpOnly: true,
+			Secure:   h.config.Server.Environment == "production",
+			SameSite: http.SameSiteStrictMode,
+		})
 	}
-
-	// Check if the direct IP is a trusted proxy
-	isTrusted := h.config.IsTrustedProxy(directIP)
-
-	// Only trust X-Forwarded-For if the request comes from a trusted proxy
-	if isTrusted {
-		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			parts := strings.Split(xff, ",")
-			for i := len(parts) - 1; i >= 0; i-- {
-				candidate := strings.TrimSpace(parts[i])
-				ip := net.ParseIP(candidate)
-				if ip == nil {
-					continue
-				}
-				if !h.config.IsTrustedProxy(ip.String()) {
-					return ip.String()
-				}
-			}
-		}
-
-		if xri := r.Header.Get("X-Real-IP"); xri != "" {
-			if ip := net.ParseIP(strings.TrimSpace(xri)); ip != nil {
-				return ip.String()
-			}
-		}
-	}
-
-	// Fallback to direct IP if not from trusted proxy or no proxy headers
-	return directIP
 }

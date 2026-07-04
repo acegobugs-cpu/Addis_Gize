@@ -276,10 +276,6 @@ func (s *AuthService) RefreshAccessToken(ctx context.Context, refreshTokenString
 	}, nil
 }
 
-func (s *AuthService) ValidateAccessToken(accessToken string) (*token.Claims, error) {
-	return s.tokenManager.ValidateAccessToken(accessToken)
-}
-
 // Logout revokes a single refresh token by deleting it from Redis
 func (s *AuthService) Logout(ctx context.Context, refreshTokenString string) error {
 	// Delegate directly to the decoupled session package layer

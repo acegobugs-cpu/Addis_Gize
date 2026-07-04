@@ -3,17 +3,19 @@ package http
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
-	"github.com/go-chi/httprate"
+	"github.com/unrolled/secure"
 	"go.uber.org/zap"
 
 	"app/internal/domain/handlers"
-	"app/internal/domain/services"
+	"app/internal/infra/caching"
 	"app/internal/pkg/config"
+	"app/internal/pkg/limiter"
 	"app/internal/pkg/logger"
 	"app/internal/pkg/middleware"
 	"app/internal/pkg/token"
@@ -23,6 +25,8 @@ import (
 type Router struct {
 	router           *chi.Mux
 	config           *config.Config
+	cache            *caching.RedisCache
+	handler          *handlers.Handler
 	userHandler      *handlers.UserHandler
 	authHandler      *handlers.AuthHandler
 	articleHandler   *handlers.ArticleHandler
@@ -36,13 +40,13 @@ type Router struct {
 // NewRouter creates a new HTTP router
 func NewRouter(
 	config *config.Config,
+	cache *caching.RedisCache,
 	userHandler *handlers.UserHandler,
 	authHandler *handlers.AuthHandler,
 	articleHandler *handlers.ArticleHandler,
 	categoryHandler *handlers.CategoryHandler,
 	authEmailHandler *handlers.AuthorizedEmailHandler,
 	mediaHandler *handlers.MediaHandler,
-	authService *services.AuthService,
 	tokenManager *token.TokenManager,
 ) *Router {
 	r := chi.NewRouter()
@@ -59,6 +63,8 @@ func NewRouter(
 	router := &Router{
 		router:           r,
 		config:           config,
+		cache:            cache,
+		handler:          handlers.NewHandler(),
 		userHandler:      userHandler,
 		authHandler:      authHandler,
 		articleHandler:   articleHandler,
@@ -69,17 +75,60 @@ func NewRouter(
 		authMiddleware:   authMiddleware,
 	}
 
-	router.setupMiddleware()
-	router.setupRoutes()
+	router.MountRoutes()
 
 	return router
 }
 
+func (r *Router) MountRoutes() http.Handler {
+	// 1. Initialize your custom limiter once at the top
+	l := limiter.NewLimiter(r.cache.Client, r.config)
+
+	// 2. Set up global technical middlewares (passing the limiter)
+	r.setupMiddleware(l)
+
+	// 3. Define the application routing trees
+	r.setupRoutes(l)
+
+	return r.router
+}
+
 // setupMiddleware sets up global middleware
-func (r *Router) setupMiddleware() {
+func (r *Router) setupMiddleware(l *limiter.Limiter) {
 	// Basic middleware
 	r.router.Use(chiMiddleware.RequestID)
 	r.router.Use(chiMiddleware.RealIP)
+
+	// FIX 1: Move secureMiddleware inside setupMiddleware so r.config is initialized and scoped correctly
+	secureMiddleware := secure.New(secure.Options{
+		// 1. Clickjacking Prevention
+		FrameDeny: true, // Sets X-Frame-Options: DENY. Prevents embedding your API/pages in malicious iframes.
+
+		// 2. MIME-Type Sniffing Protection
+		ContentTypeNosniff: true, // Sets X-Content-Type-Options: nosniff. Prevents browsers from executing raw uploads as code.
+
+		// 3. Strict Transport Security (HSTS)
+		// ONLY enable this if your production site runs completely on HTTPS!
+		STSSeconds:           31536000, // 1 Year enforcement
+		STSIncludeSubdomains: true,     // Protects *.yoursite.com
+		STSPreload:           true,     // Submits your domain to browser hardcoded HTTPS lists
+
+		// 4. Content Security Policy (Decoupled & Modernized)
+		ContentSecurityPolicy: strings.Join([]string{
+			"default-src 'self'",
+			// Allows your UI to fetch data from your Go API safely
+			"connect-src 'self' http://localhost:8080 https://api.yoursite.com",
+			// Essential Next.js runtime configurations (adjust strictly based on script needs)
+			"script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+			"style-src 'self' 'unsafe-inline'",
+			"img-src 'self' data: blob:",
+		}, "; "),
+
+		// 5. Deployment Environment Flag
+		IsDevelopment: !r.config.Server.IsProd, // Disables HTTPS-only rules during local dev loop
+	})
+	r.router.Use(secureMiddleware.Handler)
+
 	r.router.Use(chiMiddleware.Recoverer)
 	r.router.Use(chiMiddleware.Logger)
 	r.router.Use(middleware.Timeout(r.config.Server.ReadTimeout))
@@ -95,38 +144,48 @@ func (r *Router) setupMiddleware() {
 	})
 	r.router.Use(corsMiddleware.Handler)
 
-	// Rate limiting - use configured global rate limit
-	r.router.Use(httprate.LimitByIP(r.config.RateLimit.GlobalRequestsPerMinute, 1*time.Minute))
+	// Rate limiting - use configured global rate limit, but wrap it to ignore OPTIONS requests
+	r.router.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			if req.Method == http.MethodOptions {
+				next.ServeHTTP(w, req)
+				return
+			}
+			l.GlobalRateLimit(next).ServeHTTP(w, req)
+		})
+	})
 }
 
 // setupRoutes sets up application routes
-func (r *Router) setupRoutes() {
+func (r *Router) setupRoutes(l *limiter.Limiter) {
+	// Health check
+	r.router.Get("/health", r.healthCheck)
 	r.router.Route("/api/v1", func(router chi.Router) {
-		// Health check
-		router.Get("/health", r.healthCheck)
 
 		// Auth routes with per-endpoint rate limiting
 		router.Route("/auth", func(router chi.Router) {
-			router.Use(httprate.LimitByIP(r.config.RateLimit.AuthRequestsPerMinute, 1*time.Minute))
+			router.Use(l.AuthGroup)
 
-			//Routes That don't need CSRF protection
 			router.Group(func(router chi.Router) {
 				router.Get("/csrf/token", r.csrfProtection.GetCSRFTokenHandler)
-				router.With(r.authMiddleware.Middleware).Get("/me", r.authHandler.Me)
-				router.With(httprate.LimitByIP(r.config.RateLimit.RegisterRequestsPerMinute, 1*time.Minute)).Get("/invitation", r.authHandler.GetPendingInvitation)
-
+				router.With(l.CustomLimiter(10, 1*time.Minute)).Get("/invitation", r.authHandler.GetPendingInvitation)
 			})
 
 			router.Group(func(router chi.Router) {
-				router.Use(r.csrfProtection.Middleware) // Apply CSRF protection
-				router.With(httprate.LimitByIP(r.config.RateLimit.LoginRequestsPerMinute, 1*time.Minute)).Post("/login", r.authHandler.Login)
-				router.With(httprate.LimitByIP(r.config.RateLimit.RegisterRequestsPerMinute, 1*time.Minute)).Post("/register", r.authHandler.Register)
-				router.With(httprate.LimitByIP(r.config.RateLimit.RefreshRequestsPerMinute, 1*time.Minute)).Post("/refresh", r.authHandler.RefreshToken)
+				router.Use(r.csrfProtection.Middleware)
+				router.With(l.Login).Post("/login", r.authHandler.Login)
+				router.With(l.Register).Post("/register", handlers.ValidateBody[handlers.SigninRequest](r.handler, r.authHandler.Register))
+				router.With(l.Refresh).Post("/refresh", r.authHandler.RefreshToken)
+			})
+
+			router.Use(r.authMiddleware.Middleware)
+			router.Get("/me", r.authHandler.Me)
+
+			router.Group(func(router chi.Router) {
+				router.Use(r.csrfProtection.Middleware)
 				router.Post("/logout", r.authHandler.Logout)
 				router.Post("/logout-all", r.authHandler.LogoutAll)
-				router.Post("/verify", r.authHandler.VerifyToken)
 			})
-			// Apply CSRF protection to state-changing auth routes
 		})
 
 		// User routes with CSRF protection for state-changing operations
@@ -136,8 +195,8 @@ func (r *Router) setupRoutes() {
 			router.With(r.authMiddleware.Middleware).Get("/", r.userHandler.ListUsers)
 			router.Route("/{id}", func(router chi.Router) {
 				router.With(r.authMiddleware.Middleware).Get("/", r.userHandler.GetUser)
-				router.With(r.csrfProtection.Middleware).With(r.authMiddleware.Middleware).Put("/", r.userHandler.UpdateUser)
-				router.With(r.csrfProtection.Middleware).With(r.authMiddleware.Middleware).Delete("/", r.userHandler.DeleteUser)
+				router.With(r.authMiddleware.Middleware).With(r.csrfProtection.Middleware).Put("/", r.userHandler.UpdateUser)
+				router.With(r.authMiddleware.Middleware).With(r.csrfProtection.Middleware).Delete("/", r.userHandler.DeleteUser)
 			})
 		})
 
@@ -148,8 +207,8 @@ func (r *Router) setupRoutes() {
 			router.Get("/search", r.articleHandler.SearchArticles)
 			router.Route("/{id}", func(router chi.Router) {
 				router.Get("/", r.articleHandler.GetArticle)
-				router.With(r.csrfProtection.Middleware).With(r.authMiddleware.Middleware).Put("/", r.articleHandler.UpdateArticle)
-				router.With(r.csrfProtection.Middleware).With(r.authMiddleware.Middleware).Delete("/", r.articleHandler.DeleteArticle)
+				router.With(r.authMiddleware.Middleware).With(r.csrfProtection.Middleware).Put("/", r.articleHandler.UpdateArticle)
+				router.With(r.authMiddleware.Middleware).With(r.csrfProtection.Middleware).Delete("/", r.articleHandler.DeleteArticle)
 			})
 			router.Get("/slug/{slug}", r.articleHandler.GetArticleBySlug)
 		})
@@ -160,8 +219,8 @@ func (r *Router) setupRoutes() {
 			router.Get("/", r.categoryHandler.ListCategories)
 			router.Route("/{id}", func(router chi.Router) {
 				router.Get("/", r.categoryHandler.GetCategory)
-				router.With(r.csrfProtection.Middleware).With(r.authMiddleware.Middleware).Put("/", r.categoryHandler.UpdateCategory)
-				router.With(r.csrfProtection.Middleware).With(r.authMiddleware.Middleware).Delete("/", r.categoryHandler.DeleteCategory)
+				router.With(r.authMiddleware.Middleware).With(r.csrfProtection.Middleware).Put("/", r.categoryHandler.UpdateCategory)
+				router.With(r.authMiddleware.Middleware).With(r.csrfProtection.Middleware).Delete("/", r.categoryHandler.DeleteCategory)
 			})
 			router.Get("/slug/{slug}", r.categoryHandler.GetCategoryBySlug)
 		})
@@ -172,8 +231,8 @@ func (r *Router) setupRoutes() {
 			router.With(r.authMiddleware.Middleware).Get("/", r.authEmailHandler.ListAuthorizedEmails)
 			router.Route("/{slug}", func(router chi.Router) {
 				router.With(r.authMiddleware.Middleware).Get("/", r.authEmailHandler.GetAuthorizedEmail)
-				router.With(r.csrfProtection.Middleware).With(r.authMiddleware.Middleware).Post("/use", r.authEmailHandler.MarkAsUsed)
-				router.With(r.csrfProtection.Middleware).With(r.authMiddleware.Middleware).Delete("/", r.authEmailHandler.DeleteAuthorizedEmail)
+				router.With(r.authMiddleware.Middleware).With(r.csrfProtection.Middleware).Post("/use", r.authEmailHandler.MarkAsUsed)
+				router.With(r.authMiddleware.Middleware).With(r.csrfProtection.Middleware).Delete("/", r.authEmailHandler.DeleteAuthorizedEmail)
 			})
 		})
 

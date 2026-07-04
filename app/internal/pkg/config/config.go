@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/hex"
 	"fmt"
+	"net"
 	"os"
 	"strings"
 	"time"
@@ -11,18 +12,20 @@ import (
 )
 
 type Config struct {
-	Server    ServerConfig    `mapstructure:"server"`
-	Database  DatabaseConfig  `mapstructure:"database"`
-	Redis     RedisConfig     `mapstructure:"redis"`
-	Mail      MailConfig      `mapstructure:"mail"`
-	RabbitMQ  RabbitMQConfig  `mapstructure:"rabbitmq"`
-	JWT       JWTConfig       `mapstructure:"jwt"`
-	GRPC      GRPCConfig      `mapstructure:"grpc"`
-	CORS      CORSConfig      `mapstructure:"cors"`
-	Auth      AuthConfig      `mapstructure:"auth"`
-	Storage   StorageConfig   `mapstructure:"storage"`
-	RateLimit RateLimitConfig `mapstructure:"ratelimit"`
-	Security  SecurityConfig  `mapstructure:"security"`
+	Server          ServerConfig    `mapstructure:"server"`
+	Database        DatabaseConfig  `mapstructure:"database"`
+	Redis           RedisConfig     `mapstructure:"redis"`
+	Mail            MailConfig      `mapstructure:"mail"`
+	RabbitMQ        RabbitMQConfig  `mapstructure:"rabbitmq"`
+	JWT             JWTConfig       `mapstructure:"jwt"`
+	GRPC            GRPCConfig      `mapstructure:"grpc"`
+	CORS            CORSConfig      `mapstructure:"cors"`
+	Auth            AuthConfig      `mapstructure:"auth"`
+	Storage         StorageConfig   `mapstructure:"storage"`
+	RateLimit       RateLimitConfig `mapstructure:"ratelimit"`
+	Security        SecurityConfig  `mapstructure:"security"`
+	trustedNetworks []*net.IPNet
+	trustedIPs      map[string]bool
 }
 
 type ServerConfig struct {
@@ -31,6 +34,7 @@ type ServerConfig struct {
 	ReadTimeout     time.Duration `mapstructure:"read_timeout"`
 	WriteTimeout    time.Duration `mapstructure:"write_timeout"`
 	ShutdownTimeout time.Duration `mapstructure:"shutdown_timeout"`
+	IsProd          bool          `mapstructure:"is_prod"`
 	Environment     string        `mapstructure:"environment"`
 }
 
@@ -165,6 +169,7 @@ func setDefaults() {
 	viper.SetDefault("server.read_timeout", 15*time.Second)
 	viper.SetDefault("server.write_timeout", 15*time.Second)
 	viper.SetDefault("server.shutdown_timeout", 30*time.Second)
+	viper.SetDefault("server.is_prod", false)
 	viper.SetDefault("server.environment", "development")
 
 	// Database defaults
@@ -289,12 +294,49 @@ func (c *Config) GetEncryptionKey() []byte {
 	return []byte(key)
 }
 
-// IsTrustedProxy checks if an IP address is in the trusted proxy list
-func (c *Config) IsTrustedProxy(ip string) bool {
-	for _, trusted := range c.Security.TrustedProxies {
-		if ip == trusted {
+// CompileTrustedProxies should be executed right after viper.Unmarshal()
+func (c *Config) CompileTrustedProxies() {
+	c.trustedIPs = make(map[string]bool)
+	c.trustedNetworks = make([]*net.IPNet, 0)
+
+	for _, proxy := range c.Security.TrustedProxies {
+		proxy = strings.TrimSpace(proxy)
+
+		// If it contains a slash, try parsing it as a CIDR range (e.g. 10.0.0.0/8)
+		if strings.Contains(proxy, "/") {
+			_, ipNet, err := net.ParseCIDR(proxy)
+			if err == nil {
+				c.trustedNetworks = append(c.trustedNetworks, ipNet)
+			}
+			continue
+		}
+
+		// Otherwise, normalize it as a standard native IP
+		parsedIP := net.ParseIP(proxy)
+		if parsedIP != nil {
+			// Using the string representation of the parsed IP handles normalization (e.g., IPv6 zero-compression)
+			c.trustedIPs[parsedIP.String()] = true
+		}
+	}
+}
+
+// IsTrustedProxy now handles both exact IP normalization and CIDR network ranges
+func (c *Config) IsTrustedProxy(ip net.IP) bool {
+	if ip == nil {
+		return false
+	}
+
+	// 1. Check exact normalized IP list
+	if c.trustedIPs[ip.String()] {
+		return true
+	}
+
+	// 2. Check CIDR network blocks
+	for _, network := range c.trustedNetworks {
+		if network.Contains(ip) {
 			return true
 		}
 	}
+
 	return false
 }

@@ -47,21 +47,21 @@ func (m *AuthMiddleware) Middleware(next http.Handler) http.Handler {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
 			logger.Warn("Missing Authorization header")
-			m.handler.RespondError(w, errors.ErrUnauthorized.W("Missing authorization header", ""))
+			m.handler.RespondError(w, errors.ErrInvalidCredentials)
 			return
 		}
 
 		// Check if it's a Bearer token
 		if !strings.HasPrefix(authHeader, "Bearer ") {
 			logger.Warn("Invalid Authorization header format")
-			m.handler.RespondError(w, errors.ErrUnauthorized.W("Invalid authorization header format", ""))
+			m.handler.RespondError(w, errors.ErrInvalidCredentials)
 			return
 		}
 
 		token := strings.TrimPrefix(authHeader, "Bearer ")
 		if token == "" {
 			logger.Warn("Empty token after Bearer prefix")
-			m.handler.RespondError(w, errors.ErrUnauthorized.W("Empty token", ""))
+			m.handler.RespondError(w, errors.ErrInvalidCredentials)
 			return
 		}
 
@@ -69,7 +69,7 @@ func (m *AuthMiddleware) Middleware(next http.Handler) http.Handler {
 		claims, err := m.tokenManager.ValidateAccessToken(token)
 		if err != nil {
 			logger.Warn("Invalid access token", zap.Error(err))
-			m.handler.RespondError(w, errors.ErrUnauthorized.W("Invalid or expired token", ""))
+			m.handler.RespondError(w, errors.ErrInvalidCredentials)
 			return
 		}
 

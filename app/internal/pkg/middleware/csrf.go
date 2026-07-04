@@ -18,6 +18,7 @@ import (
 const (
 	csrfCookieName = "csrf_session"
 	csrfHeaderName = "X-CSRF-Token"
+	csrfTokenName  = "csrf_token"
 	csrfTokenTTL   = 1 * time.Hour
 )
 
@@ -113,9 +114,18 @@ func (c *CSRFProtection) GetCSRFTokenHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	http.SetCookie(w, &http.Cookie{
+		Name:     csrfTokenName,
+		Value:    tokenStr,
+		Path:     "/",
+		HttpOnly: true, // Hide from malicious client scripts
+		Secure:   c.isProd,
+		SameSite: http.SameSiteLaxMode,
+	})
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]string{"csrf_token": tokenStr})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "OK"})
 }
 
 // generateToken constructs a signed payload: Base64(expiry_bytes . random_salt . signature)

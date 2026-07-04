@@ -108,8 +108,8 @@ func main() {
 	mediaService := services.NewMediaService(mediaRepo, storageSvc, cfg.Storage.MaxFileSize, cfg.Storage.PublicURL)
 
 	// Initialize HTTP handlers
-	userHandler := handlers.NewUserHandler(userService)
 	authHandler := handlers.NewAuthHandler(authService, cfg)
+	userHandler := handlers.NewUserHandler(userService)
 	articleHandler := handlers.NewArticleHandler(articleService)
 	categoryHandler := handlers.NewCategoryHandler(categoryService)
 	authEmailHandler := handlers.NewAuthorizedEmailHandler(authEmailService)
@@ -118,13 +118,13 @@ func main() {
 	// Initialize HTTP router
 	router := httpInterface.NewRouter(
 		cfg,
+		cache,
 		userHandler,
 		authHandler,
 		articleHandler,
 		categoryHandler,
 		authEmailHandler,
 		mediaHandler,
-		authService,
 		tokenManager,
 	)
 
