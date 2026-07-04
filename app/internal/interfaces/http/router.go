@@ -164,7 +164,6 @@ func (r *Router) setupRoutes(l *limiter.Limiter) {
 
 		// Auth routes with per-endpoint rate limiting
 		router.Route("/auth", func(router chi.Router) {
-			router.Use(l.AuthGroup)
 
 			router.Group(func(router chi.Router) {
 				router.Get("/csrf/token", r.csrfProtection.GetCSRFTokenHandler)
@@ -172,17 +171,21 @@ func (r *Router) setupRoutes(l *limiter.Limiter) {
 			})
 
 			router.Group(func(router chi.Router) {
+				// router.Use(l.AuthGroup)  .With(l.Login)
 				router.Use(r.csrfProtection.Middleware)
-				router.With(l.Login).Post("/login", r.authHandler.Login)
+				router.Post("/login", r.authHandler.Login)
 				router.With(l.Register).Post("/register", handlers.ValidateBody[handlers.SigninRequest](r.handler, r.authHandler.Register))
 				router.With(l.Refresh).Post("/refresh", r.authHandler.RefreshToken)
 			})
 
-			router.Use(r.authMiddleware.Middleware)
-			router.Get("/me", r.authHandler.Me)
+			router.Group(func(router chi.Router) {
+				router.Use(r.authMiddleware.Middleware)
+				router.Get("/me", r.authHandler.Me)
+			})
 
 			router.Group(func(router chi.Router) {
 				router.Use(r.csrfProtection.Middleware)
+				router.Use(r.authMiddleware.Middleware)
 				router.Post("/logout", r.authHandler.Logout)
 				router.Post("/logout-all", r.authHandler.LogoutAll)
 			})

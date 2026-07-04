@@ -178,7 +178,6 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 		h.handler.RespondError(w, err)
 		return
 	}
-
 	h.setAuthCookies(w, tokens.AccessToken, tokens.RefreshToken)
 
 	h.handler.RespondJSON(w, http.StatusOK, map[string]string{"message": "Tokens refreshed successfully"})
@@ -310,7 +309,7 @@ func (h *AuthHandler) setAuthCookies(w http.ResponseWriter, accessToken, refresh
 		Path:     "/",
 		MaxAge:   int(h.config.JWT.AccessDuration.Seconds()),
 		HttpOnly: true,
-		Secure:   h.config.Server.Environment == "production",
+		Secure:   h.config.Server.IsProd,
 		SameSite: http.SameSiteStrictMode,
 	})
 
@@ -320,7 +319,7 @@ func (h *AuthHandler) setAuthCookies(w http.ResponseWriter, accessToken, refresh
 		Path:     "/",
 		MaxAge:   int(h.config.JWT.RefreshDuration.Seconds()),
 		HttpOnly: true,
-		Secure:   h.config.Server.Environment == "production",
+		Secure:   h.config.Server.IsProd,
 		SameSite: http.SameSiteStrictMode,
 	})
 
@@ -336,7 +335,7 @@ func (h *AuthHandler) clearAuthCookies(w http.ResponseWriter) {
 			Path:     "/", // Must exactly match the path configuration used when setting them
 			MaxAge:   -1,  // Tells the browser to delete the cookie instantly
 			HttpOnly: true,
-			Secure:   h.config.Server.Environment == "production",
+			Secure:   h.config.Server.IsProd,
 			SameSite: http.SameSiteStrictMode,
 		})
 	}

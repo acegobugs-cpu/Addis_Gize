@@ -3,6 +3,7 @@ package token
 import (
 	"app/internal/domain/entities"
 	"app/internal/pkg/errors"
+	stdErrors "errors"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -10,10 +11,8 @@ import (
 )
 
 type Claims struct {
-	JTI      string    `json:"jti"`
-	UserID   uuid.UUID `json:"user_id"`
-	Version  string    `json:"ver"`
-	Audience string    `json:"aud"`
+	UserID  uuid.UUID `json:"user_id"`
+	Version string    `json:"ver"`
 	jwt.RegisteredClaims
 }
 
@@ -63,6 +62,7 @@ func (m *TokenManager) GenerateAccessToken(user *entities.User) (string, string,
 	return tokenStr, jti, nil
 }
 
+// ValidateAccessToken checks a token and cleanly preserves expiration error codes
 func (m *TokenManager) ValidateAccessToken(tokenString string) (*Claims, error) {
 	parser := jwt.NewParser(
 		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
@@ -70,22 +70,27 @@ func (m *TokenManager) ValidateAccessToken(tokenString string) (*Claims, error) 
 		jwt.WithAudience(m.issuer),
 		jwt.WithExpirationRequired(),
 	)
+
 	token, err := parser.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (any, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.ErrInvalidToken
+			return nil, errors.ErrInvalidCredentials
 		}
 		return m.jwtSecret, nil
 	})
 
 	if err != nil {
-		return nil, errors.ErrInvalidToken
+		// 🟢 FIX: Extract exact token expiration signature out of the v5 parser error block
+		if stdErrors.Is(err, jwt.ErrTokenExpired) {
+			return nil, jwt.ErrTokenExpired // Bubble up standard expiration error explicitly
+		}
+		return nil, errors.ErrInvalidCredentials
 	}
 
 	if claims, ok := token.Claims.(*Claims); ok && token.Valid {
 		return claims, nil
 	}
 
-	return nil, errors.ErrInvalidToken
+	return nil, errors.ErrInvalidCredentials
 }
 
 func (m *TokenManager) GetAccessDurationSeconds() int64 {

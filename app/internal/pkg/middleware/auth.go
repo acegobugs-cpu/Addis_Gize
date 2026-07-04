@@ -2,9 +2,11 @@ package middleware
 
 import (
 	"context"
+	stdErrors "errors"
 	"net/http"
 	"strings"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
@@ -46,30 +48,35 @@ func (m *AuthMiddleware) Middleware(next http.Handler) http.Handler {
 		// Extract token from Authorization header
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			logger.Warn("Missing Authorization header")
-			m.handler.RespondError(w, errors.ErrInvalidCredentials)
+			// logger.Warn("Missing Authorization header", zap.String("path", r.URL.Path))
+			m.handler.RespondError(w, errors.ErrTokenExpired) // Responds with 1002 payload
 			return
 		}
 
 		// Check if it's a Bearer token
 		if !strings.HasPrefix(authHeader, "Bearer ") {
-			logger.Warn("Invalid Authorization header format")
-			m.handler.RespondError(w, errors.ErrInvalidCredentials)
+			logger.Warn("Invalid Authorization header format", zap.String("path", r.URL.Path))
+			m.handler.RespondError(w, errors.ErrTokenExpired) // Responds with 1002 payload
 			return
 		}
 
 		token := strings.TrimPrefix(authHeader, "Bearer ")
 		if token == "" {
-			logger.Warn("Empty token after Bearer prefix")
-			m.handler.RespondError(w, errors.ErrInvalidCredentials)
+			logger.Warn("Empty token after Bearer prefix", zap.String("path", r.URL.Path))
+			m.handler.RespondError(w, errors.ErrTokenExpired)
 			return
 		}
 
 		// Validate the token
 		claims, err := m.tokenManager.ValidateAccessToken(token)
 		if err != nil {
-			logger.Warn("Invalid access token", zap.Error(err))
-			m.handler.RespondError(w, errors.ErrInvalidCredentials)
+			if stdErrors.Is(err, jwt.ErrTokenExpired) {
+				logger.Info("Access token expired", zap.String("path", r.URL.Path))
+				m.handler.RespondError(w, errors.ErrTokenExpired.Log(context.Background(), err)) // Responds with 1002 payload
+				return
+			}
+			logger.Warn("Invalid access token", zap.Error(err), zap.String("path", r.URL.Path))
+			m.handler.RespondError(w, errors.ErrTokenExpired.Log(context.Background(), err))
 			return
 		}
 

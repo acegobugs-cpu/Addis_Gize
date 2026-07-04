@@ -249,6 +249,7 @@ func (s *AuthService) Me(ctx context.Context, userId uuid.UUID) (*entities.User,
 func (s *AuthService) RefreshAccessToken(ctx context.Context, refreshTokenString, userAgent, ipAddress string) (*token.TokenPair, error) {
 	// 1. Delegate session rotation to the state manager
 	newRefreshToken, userID, err := s.sessionManager.Rotate(ctx, refreshTokenString, userAgent, ipAddress)
+
 	if err != nil {
 		return nil, err
 	}

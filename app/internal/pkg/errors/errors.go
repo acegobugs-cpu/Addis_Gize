@@ -79,8 +79,9 @@ var (
 // Domain-specific errors
 var (
 	ErrInvalidCredentials = New(1001, "Invalid credentials", http.StatusUnauthorized)
-	ErrTokenExpired       = New(1002, "Token expired", http.StatusUnauthorized)
+	ErrTokenExpired       = New(1002, "Token expired or missing", http.StatusUnauthorized)
 	ErrInvalidToken       = New(1003, "Invalid token", http.StatusUnauthorized)
+	ErrCSRFInvalid        = New(449, "CSRF verification failed", http.StatusForbidden)
 	ErrUserExists         = New(1004, "User already exists", http.StatusConflict)
 	ErrEmailNotAuthorized = New(1005, "Email not authorized", http.StatusForbidden)
 	ErrInvalidInput       = New(1006, "Invalid input", http.StatusBadRequest)

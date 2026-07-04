@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"app/internal/domain/handlers"
+	"app/internal/pkg/errors"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -23,6 +25,7 @@ const (
 )
 
 type CSRFProtection struct {
+	handler   *handlers.Handler
 	logger    *zap.Logger
 	secretKey []byte
 	isProd    bool
@@ -35,6 +38,7 @@ func NewCSRFProtection(logger *zap.Logger, secretKey []byte, isProd bool) (*CSRF
 		return nil, fmt.Errorf("CSRF secret key must be exactly 32 bytes")
 	}
 	return &CSRFProtection{
+		handler:   handlers.NewHandler(),
 		logger:    logger,
 		secretKey: secretKey,
 		isProd:    isProd,
@@ -53,22 +57,27 @@ func (c *CSRFProtection) Middleware(next http.Handler) http.Handler {
 
 		// 2. Extract token from Header or Form
 		tokenStr := r.Header.Get(csrfHeaderName)
+		// if tokenStr == "" {
+		// 	tokenStr = r.FormValue("csrf_token")
+		// }
 		if tokenStr == "" {
-			tokenStr = r.FormValue("csrf_token")
+			c.logger.Warn("CSRF validation failed: missing Header", zap.String("path", r.URL.Path))
+			c.handler.RespondError(w, errors.ErrCSRFInvalid.W("empty header", ""))
+			return
 		}
 
 		// 3. Extract the underlying baseline session cookie
 		cookie, err := r.Cookie(csrfCookieName)
 		if err != nil || cookie.Value == "" {
 			c.logger.Warn("CSRF validation failed: missing session cookie", zap.String("path", r.URL.Path))
-			http.Error(w, "Missing CSRF session context", http.StatusForbidden)
+			c.handler.RespondError(w, errors.ErrCSRFInvalid.W("empty cookie", ""))
 			return
 		}
 
 		// 4. Validate the cryptographic token against the cookie value
 		if !c.verifyToken(tokenStr, cookie.Value) {
 			c.logger.Warn("CSRF validation failed: invalid or expired token", zap.String("path", r.URL.Path))
-			http.Error(w, "Invalid or expired CSRF token", http.StatusForbidden)
+			c.handler.RespondError(w, errors.ErrCSRFInvalid)
 			return
 		}
 
