@@ -28,10 +28,10 @@ export default function Panel() {
       label: "Articles",
       icon: <Newspaper size={18} />,
       links: [
+        { name: "Analytics", href: "/articles/analytics" },
         { name: "View", href: "/articles/view" },
         { name: "Write", href: "/articles/write" },
         { name: "Manage", href: "/articles/manage" },
-        { name: "Analytics", href: "/articles/analytics" },
       ],
     },
     {
@@ -61,7 +61,7 @@ export default function Panel() {
   ];
 
   return (
-    <div className="flex h-screen bg-canvas select-none">
+    <div className="sticky left-0 top-0 flex h-screen bg-canvas select-none">
       {/* --- ICON BAR --- */}
       <section className="w-16 h-full bg-canvas border-r border-border z-50 flex flex-col">
         {/* Synchronized Header Row */}
@@ -138,7 +138,7 @@ export default function Panel() {
                 : "text-ink hover:bg-east-light hover:text-east"
             }`}
           >
-            <span>Dashboard</span>
+            <span>Home</span>
           </Link>
 
           {navGroups.map((group) => {
@@ -165,12 +165,12 @@ export default function Panel() {
 
                 {/* Dropdown Content */}
                 {isGroupOpen && (
-                  <div className="pr-9 pl-2 flex flex-col space-y-1 border-l-2 border-border ml-5 my-1">
+                  <div className="pl-9 pr-2 flex flex-col space-y-1 border-l-2 border-border ml-5 my-1">
                     {group.links.map((link) => (
                       <Link
                         key={link.href}
                         href={link.href}
-                        className={`h-[28px] flex items-center rounded-md text-xs font-medium transition-colors ${
+                        className={`h-[28px] flex items-center px-3 rounded-md text-xs font-medium transition-colors ${
                           isActive(link.href)
                             ? "bg-east text-canvas"
                             : "text-ink/70 hover:bg-surface hover:text-ink"
@@ -188,4 +188,4 @@ export default function Panel() {
       </div>
     </div>
   );
-} 
+}

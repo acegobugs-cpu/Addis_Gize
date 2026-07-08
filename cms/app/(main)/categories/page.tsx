@@ -24,7 +24,7 @@ export default function Categories() {
   const fetchCategories = async () => {
     try {
       const categoriesData = await getCategories();
-      setCategories(categoriesData);
+      if (categoriesData.data) setCategories(categoriesData.data);
     } catch (error) {
       console.error("Error fetching categories:", error);
     } finally {
@@ -141,7 +141,7 @@ export default function Categories() {
           <p className="text-gray-700">Loading...</p>
         ) : categories.length > 0 ? (
           <div className="space-y-3">
-            {categories.map((category) => (
+            {categories.map((category, idx) => (
               <div
                 key={category.id}
                 className="flex flex-col md:flex-row justify-between items-center gap-3 border border-gray-200 p-4 rounded-lg hover:bg-gray-50 transition-colors"
@@ -178,7 +178,7 @@ export default function Categories() {
                 ) : (
                   <div className="flex flex-col md:flex-row items-center justify-between w-full gap-4">
                     <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                      <p className="text-sm text-gray-500">ID: {category.id}</p>
+                      <p className="text-sm text-gray-500">{idx+1}</p>
                       <p className="font-semibold text-gray-800">
                         {category.name}
                       </p>

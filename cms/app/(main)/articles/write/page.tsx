@@ -1,19 +1,18 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Select from "react-select";
 import { useAuth } from "@/app/components/AuthContext";
 import { Media, Category } from "@/app/types/types";
 import MediaBlock from "../../components/mediaBlock";
-import TextEditor from "../../components/textEditor";
+import TextEditor, { TextEditorRef } from "../../components/editor/textEditor";
 import { createArticle, getCategories } from "@/app/lib/api";
 
 interface ArticleFormData {
   locale: string;
-  title: string;
+  title: any;
   slug: string;
   tag: string;
-  description: string;
-  media: Media;
+  description: any;
   content: any;
   editor_id: number;
   is_published: number;
@@ -22,23 +21,20 @@ interface ArticleFormData {
 
 
 export default function ArticleForm() {
+  const editorRef = useRef<TextEditorRef>(null);
   const [formData, setFormData] = useState<ArticleFormData>({
     locale: "am",
-    title: "",
+    title: {},
     slug: "",
     tag: "primary",
-    description: "",
-    media: {
-      mediaType: "image",
-      source: "external",
-      url: "",
-    },
+    description: {},
     content: {},
     editor_id: 0,
     is_published: 0,
     category_ids: [],
   });
 
+  const [content, setContent] = useState<any>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -48,7 +44,7 @@ export default function ArticleForm() {
     const fetchCategories = async () => {
       try {
         const categoriesData = await getCategories();
-        setCategories(categoriesData);
+        if (categoriesData.data) setCategories(categoriesData.data);
       } catch {
         setError("Failed to load categories");
       }
@@ -59,18 +55,31 @@ export default function ArticleForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const editorHelpers = editorRef.current;
+    if (!editorHelpers) return;
+
+    const titleJson = editorHelpers.getTitle();
+    const descriptionJson = editorHelpers.getDescription();
+    const bodyJson = editorHelpers.getBody();
+
+    // Validation
+    const titleText = titleJson.content?.[0]?.text?.trim() || "";
+    if (!titleText) {
+      alert("Title is required");
+      return;
+    }
+
     const payload = {
       tag: formData.tag,
-      media: formData.media || null,
       category_ids: formData.category_ids,
       translations: [
         {
           id: 0,
           locale: formData.locale,
-          title: formData.title,
+          title: titleJson,
           slug: formData.slug,
-          description: formData.description,
-          content: formData.content,
+          description: descriptionJson,
+          content: bodyJson,
           editor_id: user?.id || 0,
           published_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -83,15 +92,10 @@ export default function ArticleForm() {
       setSuccess(true);
       setFormData({
         locale: "am",
-        title: "",
+        title: {},
         slug: "",
         tag: "primary",
-        description: "",
-        media: {
-          mediaType: "image",
-          source: "external",
-          url: "",
-        },
+        description: {},
         content: {},
         editor_id: 0,
         is_published: 0,
@@ -119,10 +123,10 @@ export default function ArticleForm() {
     setFormData({ ...formData, title, slug });
   };
 
-  const categoryOptions = [{value:"nnn", label:"kjkk"}]/* categories?.map((category) => ({
+  const categoryOptions = categories?.map((category) => ({
     value: category.id,
     label: category.name,
-  }));*/
+  })) || [];
 
   return (
     <div className="mx-auto p-6 rounded-lg shadow-lg w-full bg-white text-black">
@@ -179,42 +183,9 @@ export default function ArticleForm() {
             />
           </div>
         </div>
-        {/*inser media to formData */}
-        <MediaBlock
-          data={
-            formData.media || {
-              mediaType: "image",
-              source: "external",
-              url: "",
-            }
-          }
-          onChange={(updated) => setFormData({ ...formData, media: updated })}
-        />
-
-        <input
-          type="text"
-          placeholder="Title"
-          value={formData.title}
-          onChange={handleTitleChange}
-          className="border border-gray-300 bg-white text-gray-800 p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          required
-        />
-
-        <textarea
-          placeholder="Description"
-          value={formData.description}
-          onChange={(e) =>
-            setFormData({ ...formData, description: e.target.value })
-          }
-          className="border border-gray-300 bg-white text-gray-800 p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          rows={3}
-        />
-
         <h1 className="font-semibold text-lg text-gray-800">Content</h1>
         <TextEditor
-          onChange={(json: any) => 
-            setFormData((prev) => ({ ...prev, content: json }))
-          }
+          onChange={(json) => setContent(json)}
         />
 
         <button

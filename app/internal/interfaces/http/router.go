@@ -234,10 +234,10 @@ func (r *Router) setupRoutes(l *limiter.Limiter) {
 			router.Group(func(router chi.Router) {
 				router.Use(r.csrfProtection.Middleware)
 				router.Use(r.authMiddleware.Middleware)
-				router.Post("/", r.categoryHandler.CreateCategory)
+				router.Post("/", handlers.ValidateBody[handlers.CreateCategoryRequest](r.handler, r.categoryHandler.CreateCategory))
 				router.Route("/{id}", func(router chi.Router) {
-					router.With(r.authMiddleware.Middleware).With(r.csrfProtection.Middleware).Put("/", r.categoryHandler.UpdateCategory)
-					router.With(r.authMiddleware.Middleware).With(r.csrfProtection.Middleware).Delete("/", r.categoryHandler.DeleteCategory)
+					router.Put("/", r.categoryHandler.UpdateCategory)
+					router.Delete("/", r.categoryHandler.DeleteCategory)
 				})
 			})
 		})

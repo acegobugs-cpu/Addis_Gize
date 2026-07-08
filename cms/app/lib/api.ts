@@ -15,25 +15,39 @@ import {
   Invite,
 } from "../types/types";
 
+// 1. Mirror your Go AppError struct in TypeScript
+interface AppResponse<T = any> {
+  success: boolean;
+  statusCode?: number; // Internal App Code
+  message?: string;
+  details?: string;
+  data?: T;
+}
+
 /**
- * Helper utility to process response payloads uniformly.
- * Server Actions return data directly to the client components.
+ * Robust helper utility to process Go AppError & success payloads uniformly.
  */
 async function handleResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    let message = `HTTP error! status: ${response.status}`;
-    try {
-      const body = await response.json();
-      if (body?.message) message = body.message;
-    } catch {
-      // ignore non-JSON error bodies
-    }
-    throw new Error(message);
-  }
+  // Handle HTTP No Content safely
   if (response.status === 204) {
     return {} as T;
   }
-  return (await response.json()) || [];
+
+  let body: AppResponse<T> | null = null;
+  try {
+    body = await response.json();
+  } catch {
+    // Fallback if the body isn't JSON at all
+  }
+
+  // Check if network failed OR if backend explicitly marked success: false
+  if (!response.ok || (body && body.success === false)) {
+    const errorMessage = body?.message || body?.details || `HTTP error! status: ${response.status}`;
+    throw new Error(errorMessage);
+  }
+
+  // Fallback if the backend returned a flat object/array instead of nesting it in "data"
+  return (body as T) || ([] as unknown as T);
 }
 
 // ==========================================
@@ -149,7 +163,7 @@ export async function deleteLocale(id: number) {
 
 export async function getCategories() {
   const res = await backend.get("/categories");
-  return handleResponse<Category[]>(res);
+  return handleResponse<AppResponse<Category[]>>(res);
 }
 
 export async function getCategoryById(id: string) {

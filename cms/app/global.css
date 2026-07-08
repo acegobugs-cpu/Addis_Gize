@@ -45,12 +45,6 @@
     --foreground: var(--color-ink);
   }
 
-/* @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-} */
 
 body {
   background: var(--color-canvas);
@@ -58,3 +52,56 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Visual separation inside the editor */
+.docs-editor .ProseMirror {
+  padding: 40px 48px;
+}
+
+.docs-editor .ProseMirror h1[data-type="article-title"] {
+  font-size: 2.8rem;
+  font-weight: 800;
+  line-height: 1.1;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 3px solid #e5e7eb;
+  color: #111;
+}
+
+.docs-editor .ProseMirror [data-type="headMedia"] {
+  border: 2px dashed #9ca3af;
+  border-radius: 12px;
+  padding: 3rem 2rem;
+  margin: 2.5rem 0;
+  text-align: center;
+  background: #f9fafb;
+}
+
+.docs-editor .ProseMirror [data-type="article-description"] {
+  font-size: 1.15rem;
+  line-height: 1.6;
+  color: #374151;
+  margin-bottom: 2.5rem;
+  padding-bottom: 2rem;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+/* Labels */
+.docs-editor .ProseMirror h1[data-type="article-title"]::before {
+  content: "ARTICLE TITLE";
+  display: block;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  color: #6b7280;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+}
+
+.docs-editor .ProseMirror [data-type="article-description"]::before {
+  content: "DESCRIPTION / SUMMARY";
+  display: block;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  color: #6b7280;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+}

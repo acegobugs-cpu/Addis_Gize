@@ -1,78 +1,121 @@
 import { Extension, Node, RawCommands, mergeAttributes } from "@tiptap/core";
+import { Plugin, PluginKey } from "prosemirror-state";
 
+// =============================================
+// ARTICLE TITLE - SINGLE INSTANCE
+// =============================================
 export const ArticleTitle = Node.create({
   name: "articleTitle",
-
   group: "block",
-
-  content: "text*",
-
+  content: "inline*",
   defining: true,
+  priority: 1000,
 
   parseHTML() {
-    return [{ tag: "h1[data-title]" }];
+    return [{ tag: 'h1[data-type="article-title"]' }];
   },
 
   renderHTML({ HTMLAttributes }) {
     return [
       "h1",
       mergeAttributes(HTMLAttributes, {
-        "data-title": "",
-        style: "font-size: 2.5rem;font-weight: 800;",
+        "data-type": "article-title",
+        class: "article-title text-4xl font-bold tracking-tight mb-8 p-6 border-2 border-gray-200 rounded-2xl bg-white",
       }),
       0,
     ];
   },
+
+  addAttributes() {
+    return { placeholder: { default: "Enter article title..." } };
+  },
+
+  addKeyboardShortcuts() {
+    return {
+      "Mod-Shift-T": () => false, // Disable manual insertion if needed
+    };
+  },
+
+  // Prevent multiple titles
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: new PluginKey("preventMultipleTitles"),
+        props: {
+          transformPasted: (slice: any) => {
+            const hasTitle = slice.content.content.some(
+              (node: any) => node.type.name === "articleTitle"
+            );
+            if (hasTitle) {
+              // You can customize behavior here
+              return slice;
+            }
+            return slice;
+          },
+        },
+      }),
+    ];
+  },
 });
 
+// =============================================
+// ARTICLE DESCRIPTION - SINGLE INSTANCE
+// =============================================
 export const ArticleDescription = Node.create({
   name: "articleDescription",
-
   group: "block",
-
-  content: "text*",
+  content: "block*",
+  defining: true,
+  priority: 900,
 
   parseHTML() {
-    return [{ tag: "p[data-description]" }];
+    return [{ tag: 'div[data-type="article-description"]' }];
   },
 
   renderHTML({ HTMLAttributes }) {
     return [
-      "p",
+      "div",
       mergeAttributes(HTMLAttributes, {
-        "data-description": "",
-        style: "font-size: 1.2rem;color: #555;",
+        "data-type": "article-description",
+        class: "article-description border-2 border-dashed border-gray-300 rounded-2xl p-8 mb-10 bg-gray-50 min-h-[140px]",
       }),
       0,
     ];
   },
+
+  addAttributes() {
+    return { placeholder: { default: "Write description / summary here..." } };
+  },
 });
 
+// =============================================
+// HEAD MEDIA (for featured image/video)
+// =============================================
 export const HeadMedia = Node.create({
   name: "headMedia",
-
   group: "block",
-
   atom: true,
+  draggable: true,
 
   addAttributes() {
     return {
-      mediaId: {
-        default: null,
-      },
+      mediaType: { default: "image" },
+      source: { default: "external" },
+      url: { default: "" },
+      caption: { default: "" },
     };
   },
 
   parseHTML() {
-    return [{ tag: "figure[data-head-media]" }];
+    return [{ tag: 'figure[data-type="head-media"]' }];
   },
 
   renderHTML({ HTMLAttributes }) {
     return [
       "figure",
       mergeAttributes(HTMLAttributes, {
-        "data-head-media": "",
-        style: "margin: 20px 0;",
+        "data-type": "head-media",
+        class: "head-media my-8 text-center",
       }),
       0,
     ];

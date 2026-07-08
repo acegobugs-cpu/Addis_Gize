@@ -32,9 +32,9 @@ type CreateCategoryRequest struct {
 
 // CreateCategory handles creating a new category
 func (h *CategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Request) {
-	var req CreateCategoryRequest
-	if err := h.handler.ParseJSON(r, &req); err != nil {
-		h.handler.RespondError(w, errors.ErrInvalidInput)
+	req, ok := r.Context().Value(ValidatedBodyKey).(CreateCategoryRequest)
+	if !ok {
+		h.handler.RespondError(w, errors.ErrInternalServer.W("Failed to validate request", ""))
 		return
 	}
 
@@ -65,7 +65,13 @@ func (h *CategoryHandler) GetCategory(w http.ResponseWriter, r *http.Request) {
 
 // GetCategoryBySlug handles getting a category by slug
 func (h *CategoryHandler) GetCategoryBySlug(w http.ResponseWriter, r *http.Request) {
-	h.handler.RespondJSON(w, http.StatusOK, map[string]string{"message": "Get category by slug endpoint"})
+	slug := chi.URLParam(r, "slug")
+	res, err := h.categoryService.GetCategoryBySlug(r.Context(), slug)
+	if err != nil {
+		h.handler.RespondError(w, err)
+		return
+	}
+	h.handler.RespondJSON(w, http.StatusOK, res)
 }
 
 // UpdateCategory handles updating a category
