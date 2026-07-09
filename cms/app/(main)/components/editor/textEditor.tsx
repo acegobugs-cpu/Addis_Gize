@@ -16,8 +16,10 @@ import {
   MediaBlock,
   FontSize,
   Highlight,
+  ArticleDocument,
   ArticleTitle,
   ArticleDescription,
+  SectionNavigation,
   HeadMedia,
 } from "./editorExtentions";
 
@@ -31,7 +33,7 @@ interface EditorProps {
 
 export interface TextEditorRef {
   getTitle: () => any;
-  getDescription: () => any;     // Will contain media + text
+  getDescription: () => any;     // Subtitle / summary text only
   getBody: () => any;            // Main content only
   getContent: () => any;         // Full JSON
   editor: any;
@@ -41,8 +43,8 @@ const defaultDoc = {
   type: "doc",
   content: [
     { type: "articleTitle" },
-    { type: "articleDescription" },   // Will include media
-    { type: "paragraph" },            // Start of body
+    { type: "articleDescription" },
+    { type: "paragraph" }, // start of body - media can be inserted here via the toolbar
   ],
 };
 
@@ -65,10 +67,21 @@ const TextEditor = forwardRef<TextEditorRef, EditorProps>(({ initialValue, onCha
 
   const editor = useEditor({
     extensions: [
+      ArticleDocument,
       ArticleTitle,
-      HeadMedia,
       ArticleDescription,
+      SectionNavigation,
+      HeadMedia,
       StarterKit.configure({
+        // We bring our own top node (ArticleDocument) so the built-in
+        // one must be disabled, or Tiptap will complain about two
+        // extensions named "doc".
+        document: false,
+        // Without this, the Trailing Node extension would fall back to
+        // guessing a default trailing node type from the schema - and
+        // since articleTitle is the first node in our content
+        // expression, it could wrongly pick that. Pin it to paragraph.
+        trailingNode: { node: "paragraph" },
         heading: { levels: [1, 2, 3] },
         bulletList: { HTMLAttributes: { class: "list-disc ml-5" } },
         orderedList: { HTMLAttributes: { class: "list-decimal ml-5" } },
@@ -76,7 +89,7 @@ const TextEditor = forwardRef<TextEditorRef, EditorProps>(({ initialValue, onCha
       Placeholder.configure({
         placeholder: ({ node }) => {
           if (node.type.name === "articleTitle") return "Enter article title...";
-          if (node.type.name === "articleDescription") return "Write description and add media...";
+          if (node.type.name === "articleDescription") return "Write a short description...";
           return "Start writing the main article content...";
         },
         showOnlyCurrent: false,
@@ -120,11 +133,10 @@ const getTitle = () => {
 const getDescription = () => {
   const json = editor?.getJSON();
   const node = json?.content?.find((n: any) => n.type === "articleDescription");
-  
+
   return {
     type: "articleDescription",
     content: node?.content || [],
-    attrs: node?.attrs || {},           // for media, alignment, etc.
   };
 };
 
@@ -180,29 +192,13 @@ const getContent = () => editor?.getJSON(); // Full document
     setPendingFontSize(value);
   };
 
-  useEffect(() => {
-  if (!editor) return;
-
-  const preventDuplicates = () => {
-    const json = editor.getJSON();
-    const titles = json.content?.filter((n: any) => n.type === "articleTitle") || [];
-    const descriptions = json.content?.filter((n: any) => n.type === "articleDescription") || [];
-
-    if (titles.length > 1) {
-      editor.commands.deleteNode("articleTitle");
-    }
-    if (descriptions.length > 1) {
-      editor.commands.deleteNode("articleDescription");
-    }
-  };
-
-  editor.on("update", preventDuplicates);
-
-  return () => {
-    editor.off("update", preventDuplicates);
-  };
-}, [editor]);
-
+  // NOTE: there's intentionally no reactive "delete duplicate title/description"
+  // effect here anymore. That approach could only ever react *after* an invalid
+  // state briefly existed (causing flicker, and it only removed one extra node
+  // per update). Duplication is now impossible by construction: ArticleDocument's
+  // content expression is "articleTitle articleDescription block+", and neither
+  // node belongs to the "block" group, so the schema itself rejects any attempt
+  // to insert, paste, or convert a second title/description anywhere in the doc.
 
   if (!editor) return null;
 
@@ -214,21 +210,30 @@ const getContent = () => editor?.getJSON(); // Full document
           caret-color: #1a73e8;
         }
         .docs-editor .ProseMirror h1[data-type="article-title"] {
-          font-size: 2.75rem;
-          font-weight: 800;
-          margin-bottom: 2rem;
-          padding-bottom: 1.5rem;
-          border-bottom: 3px solid #e5e7eb;
+          font-size: 2.5rem;
+          line-height: 1.25;
+          font-weight: 700;
+          letter-spacing: -0.01em;
+          color: #202124;
+          margin: 0 0 0.5rem;
         }
-        .docs-editor .ProseMirror [data-type="article-description"] {
-          font-size: 1.2rem;
-          line-height: 1.7;
-          color: #374151;
-          margin-bottom: 2.5rem;
-          padding: 1.5rem;
-          border: 2px dashed #9ca3af;
-          border-radius: 12px;
-          background: #f9fafb;
+        .docs-editor .ProseMirror p[data-type="article-description"] {
+          font-size: 1.25rem;
+          line-height: 1.5;
+          font-weight: 400;
+          color: #5f6368;
+          margin: 0 0 2rem;
+          padding-bottom: 1.5rem;
+          border-bottom: 1px solid #e8eaed;
+        }
+        .docs-editor .ProseMirror h1[data-type="article-title"].is-empty::before,
+        .docs-editor .ProseMirror p[data-type="article-description"].is-empty::before {
+          color: #9aa0a6;
+          font-weight: 400;
+          content: attr(data-placeholder);
+          float: left;
+          height: 0;
+          pointer-events: none;
         }
       `}</style>
 

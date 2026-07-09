@@ -1,15 +1,49 @@
-import { Extension, Node, RawCommands, mergeAttributes } from "@tiptap/core";
-import { Plugin, PluginKey } from "prosemirror-state";
+import { Extension, Node, mergeAttributes } from "@tiptap/core";
+import Document from "@tiptap/extension-document";
+import { TextSelection } from "prosemirror-state";
 
 // =============================================
-// ARTICLE TITLE - SINGLE INSTANCE
+// DOCUMENT SCHEMA - FORCED CONTENT STRUCTURE
+// =============================================
+// This is Tiptap's own "forced content structure" pattern
+// (https://tiptap.dev/docs/examples/advanced/forced-content-structure):
+// the top node's `content` expression is what actually guarantees
+// "always exactly one title, then exactly one description, then the
+// body" - not a runtime check. articleTitle/articleDescription are
+// intentionally NOT part of the "block" group, so they can never be
+// matched by the body's `block+` slot, inserted mid-document, pasted
+// in twice, or converted into from the block-type dropdown.
+export const ArticleDocument = Document.extend({
+  content: "articleTitle articleDescription block+",
+});
+
+// Shared helper: since the schema above guarantees the doc always
+// starts with exactly [articleTitle, articleDescription, ...body],
+// we can compute every section boundary directly instead of
+// searching for nodes.
+export function getSectionPositions(doc: any) {
+  const title = doc.child(0);
+  const description = doc.child(1);
+  const titleSize = title.nodeSize;
+  const descriptionSize = description.nodeSize;
+
+  return {
+    titleContentStart: 1,
+    titleContentEnd: titleSize - 1,
+    descriptionContentStart: titleSize + 1,
+    descriptionContentEnd: titleSize + descriptionSize - 1,
+    bodyStart: titleSize + descriptionSize, // position just before the first body block
+  };
+}
+
+// =============================================
+// ARTICLE TITLE - SINGLE INSTANCE, ALWAYS FIRST
 // =============================================
 export const ArticleTitle = Node.create({
   name: "articleTitle",
-  group: "block",
   content: "inline*",
   defining: true,
-  priority: 1000,
+  isolating: true, // fences backspace/join operations at its boundary
 
   parseHTML() {
     return [{ tag: 'h1[data-type="article-title"]' }];
@@ -20,71 +54,153 @@ export const ArticleTitle = Node.create({
       "h1",
       mergeAttributes(HTMLAttributes, {
         "data-type": "article-title",
-        class: "article-title text-4xl font-bold tracking-tight mb-8 p-6 border-2 border-gray-200 rounded-2xl bg-white",
+        class: "article-title",
       }),
       0,
     ];
-  },
-
-  addAttributes() {
-    return { placeholder: { default: "Enter article title..." } };
   },
 
   addKeyboardShortcuts() {
     return {
-      "Mod-Shift-T": () => false, // Disable manual insertion if needed
-    };
-  },
+      // Enter moves down into the description instead of splitting
+      // the title into two nodes (which the schema would reject anyway).
+      // Shift-Enter still inserts a hard break inside the title, via
+      // HardBreak's own default shortcut - we only handle plain Enter.
+      Enter: () => {
+        const editor = this.editor;
+        const { $from } = editor.state.selection;
+        if ($from.parent.type.name !== this.name) return false;
 
-  // Prevent multiple titles
-  addProseMirrorPlugins() {
-    return [
-      new Plugin({
-        key: new PluginKey("preventMultipleTitles"),
-        props: {
-          transformPasted: (slice: any) => {
-            const hasTitle = slice.content.content.some(
-              (node: any) => node.type.name === "articleTitle"
-            );
-            if (hasTitle) {
-              // You can customize behavior here
-              return slice;
-            }
-            return slice;
-          },
-        },
-      }),
-    ];
+        editor
+          .chain()
+          .focus()
+          .command(({ tr, dispatch }) => {
+            if (!dispatch) return true;
+            if (!tr.selection.empty) tr.deleteSelection();
+            const { descriptionContentStart } = getSectionPositions(tr.doc);
+            const pos = Math.min(descriptionContentStart, tr.doc.content.size);
+            tr.setSelection(TextSelection.near(tr.doc.resolve(pos)));
+            tr.scrollIntoView();
+            return true;
+          })
+          .run();
+
+        return true;
+      },
+    };
   },
 });
 
 // =============================================
-// ARTICLE DESCRIPTION - SINGLE INSTANCE
+// ARTICLE DESCRIPTION - SINGLE INSTANCE, ALWAYS SECOND
 // =============================================
 export const ArticleDescription = Node.create({
   name: "articleDescription",
-  group: "block",
   content: "block*",
   defining: true,
-  priority: 900,
+  isolating: true,
 
   parseHTML() {
-    return [{ tag: 'div[data-type="article-description"]' }];
+    return [{ tag: 'p[data-type="article-description"]' }];
   },
 
   renderHTML({ HTMLAttributes }) {
     return [
-      "div",
+      "p",
       mergeAttributes(HTMLAttributes, {
         "data-type": "article-description",
-        class: "article-description border-2 border-dashed border-gray-300 rounded-2xl p-8 mb-10 bg-gray-50 min-h-[140px]",
+        class: "article-description",
       }),
       0,
     ];
   },
 
-  addAttributes() {
-    return { placeholder: { default: "Write description / summary here..." } };
+  addKeyboardShortcuts() {
+    return {
+      // Enter moves down into the body's first block.
+      Enter: () => {
+        const editor = this.editor;
+        const { $from } = editor.state.selection;
+        if ($from.parent.type.name !== this.name) return false;
+
+        editor
+          .chain()
+          .focus()
+          .command(({ tr, dispatch }) => {
+            if (!dispatch) return true;
+            if (!tr.selection.empty) tr.deleteSelection();
+            const { bodyStart } = getSectionPositions(tr.doc);
+            const pos = Math.min(bodyStart + 1, tr.doc.content.size);
+            tr.setSelection(TextSelection.near(tr.doc.resolve(pos)));
+            tr.scrollIntoView();
+            return true;
+          })
+          .run();
+
+        return true;
+      },
+      // Backspace at the very start moves the cursor back into the
+      // title instead of trying (and failing) to merge two different
+      // node types together.
+      Backspace: () => {
+        const editor = this.editor;
+        const { $from, empty } = editor.state.selection;
+        if (!empty || $from.parent.type.name !== this.name) return false;
+        if ($from.parentOffset !== 0) return false;
+
+        editor
+          .chain()
+          .focus()
+          .command(({ tr, dispatch }) => {
+            if (!dispatch) return true;
+            const { titleContentEnd } = getSectionPositions(tr.doc);
+            tr.setSelection(TextSelection.near(tr.doc.resolve(titleContentEnd)));
+            tr.scrollIntoView();
+            return true;
+          })
+          .run();
+
+        return true;
+      },
+    };
+  },
+});
+
+// =============================================
+// SECTION NAVIGATION - handles the one transition that isn't owned
+// by a specific node: Backspace at the very start of the FIRST body
+// block should move the cursor back into the description, rather
+// than merging body text into it.
+// =============================================
+export const SectionNavigation = Extension.create({
+  name: "sectionNavigation",
+
+  addKeyboardShortcuts() {
+    return {
+      Backspace: () => {
+        const editor = this.editor;
+        const { state } = editor;
+        const { $from, empty } = state.selection;
+        if (!empty || $from.depth !== 1 || $from.parentOffset !== 0) return false;
+
+        const { bodyStart } = getSectionPositions(state.doc);
+        if ($from.before(1) !== bodyStart) return false;
+
+        editor
+          .chain()
+          .focus()
+          .command(({ tr, dispatch }) => {
+            if (!dispatch) return true;
+            const { descriptionContentEnd } = getSectionPositions(tr.doc);
+            tr.setSelection(TextSelection.near(tr.doc.resolve(descriptionContentEnd)));
+            tr.scrollIntoView();
+            return true;
+          })
+          .run();
+
+        return true;
+      },
+    };
   },
 });
 

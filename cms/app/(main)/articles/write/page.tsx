@@ -62,6 +62,10 @@ export default function ArticleForm() {
     const descriptionJson = editorHelpers.getDescription();
     const bodyJson = editorHelpers.getBody();
 
+    console.log("title: ", titleJson);
+    console.log("description: ", descriptionJson);
+    console.log("body: ", bodyJson);
+
     // Validation
     const titleText = titleJson.content?.[0]?.text?.trim() || "";
     if (!titleText) {
@@ -185,6 +189,7 @@ export default function ArticleForm() {
         </div>
         <h1 className="font-semibold text-lg text-gray-800">Content</h1>
         <TextEditor
+          ref={editorRef}
           onChange={(json) => setContent(json)}
         />
 
