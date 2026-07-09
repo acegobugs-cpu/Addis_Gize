@@ -13,7 +13,7 @@ interface CanvasProps {
 
 export default function Canvas({ editor, showImageWindow, setShowImageWindow }: CanvasProps) {
   return (
-    <div className="flex justify-center px-4 py-10 z-0">
+    <div className="flex justify-center px-4 py-10">
       <div
         className="relative bg-white w-full max-w-[816px] min-h-[1200px] rounded-sm overflow-hidden"
         style={{
