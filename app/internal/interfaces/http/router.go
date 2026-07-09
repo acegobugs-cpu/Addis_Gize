@@ -254,11 +254,19 @@ func (r *Router) setupRoutes(l *limiter.Limiter) {
 		})
 
 		router.Route("/uploads", func(router chi.Router) {
-			router.With(r.csrfProtection.Middleware).With(r.authMiddleware.Middleware).Post("/", r.mediaHandler.UploadFile)
-			router.With(r.authMiddleware.Middleware).Get("/", r.mediaHandler.ListUploadedFiles)
-			// router.Put("/:id")
-			router.Get("/{filename}", r.mediaHandler.GetFile)
-			// router.Delete("/:id")
+			router.Group(func(router chi.Router) {
+				router.Use(r.authMiddleware.Middleware)
+				router.Get("/", r.mediaHandler.ListUploadedFiles)
+				router.Get("/{filename}", r.mediaHandler.GetFile)
+			})
+
+			router.Group(func(router chi.Router) {
+				router.Use(r.csrfProtection.Middleware)
+				router.Use(r.authMiddleware.Middleware)
+				router.Post("/", r.mediaHandler.UploadFile)
+				// router.Put("/:id")
+				// router.Delete("/:id")
+			})
 		})
 	})
 }

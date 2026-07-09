@@ -78,12 +78,12 @@ func (h *MediaHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 func (h *MediaHandler) ListUploadedFiles(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// 1. Extract user context (Depends(get_current_user) equivalent)
-	userID := ctx.Value("user_id")
-	if userID == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+	// // 1. Extract user context (Depends(get_current_user) equivalent)
+	// userID := ctx.Value("user_id")
+	// if userID == nil {
+	// 	http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	// 	return
+	// }
 
 	// 2. Call Service Layer
 	res, err := h.mediaService.ListUploadedFiles(ctx)
