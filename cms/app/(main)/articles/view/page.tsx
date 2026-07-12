@@ -42,8 +42,12 @@ export default function Articles() {
 
   const fetchArticles = async () => {
     try {
-      const data = await getArticles();
-      setArticles(data);
+      const res = await getArticles();
+      if (res.data?.length){
+         setArticles(res.data);
+         console.log("kkk",res.data)
+        console.log(articles)
+      }
       setLoading(false);
     } catch (error) {
       console.error("Error fetching articles:", error);

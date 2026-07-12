@@ -115,7 +115,7 @@ export async function updateUser(id: number, data: Partial<User>) {
 
 export async function getArticles() {
   const res = await backend.get("/articles");
-  return handleResponse<Article[]>(res);
+  return handleResponse<AppResponse<Article[]>>(res);
 }
 
 export async function getArticleById(id: string) {

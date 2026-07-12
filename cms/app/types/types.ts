@@ -19,10 +19,10 @@ export interface User {
 }
 
 export interface Article {
-  id: number;
+  id: string;
   tag: string;
   media?: Media;
-  category_ids: number[];
+  category_ids: string[];
   categories: Category[];
   translations: ArticleTranslation[];
   created_at: string;

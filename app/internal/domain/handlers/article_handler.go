@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"app/internal/domain/appContext"
 	"app/internal/domain/entities"
 	"app/internal/domain/services"
 	"app/internal/pkg/errors"
@@ -27,22 +28,23 @@ func NewArticleHandler(articleService *services.ArticleService) *ArticleHandler 
 // CreateArticleRequest represents a create article request
 type CreateArticleRequest struct {
 	Tag          string                 `json:"tag"`
-	Media        map[string]interface{} `json:"media,omitempty"`
+	Media        map[string]any         `json:"media,omitempty"`
 	CategoryIDs  []uuid.UUID            `json:"category_ids"`
 	Translations []ArticleLocaleRequest `json:"translations"`
 }
 
 // ArticleLocaleRequest represents an article locale request
 type ArticleLocaleRequest struct {
-	Locale      string                 `json:"locale"`
-	Title       string                 `json:"title"`
-	Slug        string                 `json:"slug"`
-	Description string                 `json:"description"`
-	Content     map[string]interface{} `json:"content,omitempty"`
+	Locale      string         `json:"locale"`
+	Title       string         `json:"title"`
+	Slug        string         `json:"slug"`
+	Description string         `json:"description"`
+	Content     map[string]any `json:"content,omitempty"`
 }
 
 // CreateArticle handles creating a new article
 func (h *ArticleHandler) CreateArticle(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	var req CreateArticleRequest
 	if err := h.handler.ParseJSON(r, &req); err != nil {
 		h.handler.RespondError(w, errors.ErrInvalidInput)
@@ -50,7 +52,7 @@ func (h *ArticleHandler) CreateArticle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get editor ID from context
-	editorID, ok := h.handler.GetUserIDFromContext(r)
+	editorID, ok := appContext.GetUserID(ctx)
 	if !ok {
 		h.handler.RespondError(w, errors.ErrUnauthorized)
 		return
@@ -61,7 +63,7 @@ func (h *ArticleHandler) CreateArticle(w http.ResponseWriter, r *http.Request) {
 
 	// Create locales
 	for _, transReq := range req.Translations {
-		locale := entities.NewArticleLocale(uuid.Nil, editorID, transReq.Locale, transReq.Title, transReq.Slug, transReq.Description)
+		locale := entities.NewArticleLocale(nil, editorID, transReq.Locale, transReq.Title, transReq.Slug, transReq.Description)
 		locale.Content = transReq.Content
 		article.Translations = append(article.Translations, locale)
 	}

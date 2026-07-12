@@ -10,9 +10,7 @@ import (
 type contextKey string
 
 const (
-	UserIDKey   contextKey = "user_id"
-	UsernameKey contextKey = "username"
-	EmailKey    contextKey = "email"
+	UserIDKey contextKey = "user_id"
 )
 
 // GetUserID extracts the typed UUID directly from the context safely

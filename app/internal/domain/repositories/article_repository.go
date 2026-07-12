@@ -10,6 +10,7 @@ import (
 	"app/internal/domain/entities"
 	"app/internal/infra/database"
 	"app/internal/pkg/errors"
+	"app/internal/pkg/logger"
 )
 
 // ArticleRepository implements ArticleRepository interface
@@ -47,14 +48,13 @@ func (r *ArticleRepository) Create(ctx context.Context, article *entities.Articl
 
 	// Create locales
 	for _, locale := range article.Translations {
-		locale.ArticleID = article.ID
 		localeQuery := `
 			INSERT INTO article_locale (article_id, editor_id, locale, title, slug, description, content, published_at, updated_at)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 			RETURNING id
 		`
 		err = tx.QueryRow(ctx, localeQuery,
-			locale.ArticleID,
+			article.ID,
 			locale.EditorID,
 			locale.Locale,
 			locale.Title,
@@ -66,6 +66,7 @@ func (r *ArticleRepository) Create(ctx context.Context, article *entities.Articl
 		).Scan(&locale.ID)
 
 		if err != nil {
+			logger.LogError(ctx, err, "")
 			return fmt.Errorf("failed to create article locale: %w", err)
 		}
 	}
