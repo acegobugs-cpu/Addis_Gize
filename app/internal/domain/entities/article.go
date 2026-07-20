@@ -47,6 +47,23 @@ type ArticleLocale struct {
 	UpdatedAt   time.Time      `json:"updated_at"`
 }
 
+type Story struct {
+	ID          uuid.UUID      `json:"id"`
+	ArticleID   *uuid.UUID     `json:"article_id"`
+	Tag         string         `json:"tag"`
+	Media       map[string]any `json:"media,omitempty"`
+	Categories  []Category     `json:"categories,omitempty"`
+	EditorID    uuid.UUID      `json:"editor_id"`
+	Locale      string         `json:"locale"`
+	Title       string         `json:"title"`
+	Slug        string         `json:"slug"`
+	Description string         `json:"description"`
+	Content     map[string]any `json:"content,omitempty"`
+
+	PublishedAt time.Time `json:"published_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
 // NewArticleLocale creates a new article locale entity
 func NewArticleLocale(articleID *uuid.UUID, editorID uuid.UUID, locale, title, slug, description string) *ArticleLocale {
 	now := time.Now()

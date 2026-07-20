@@ -7,7 +7,9 @@ import (
 	"app/internal/domain/entities"
 	"app/internal/domain/services"
 	"app/internal/pkg/errors"
+	"app/internal/pkg/logger"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
@@ -102,6 +104,27 @@ func (h *ArticleHandler) DeleteArticle(w http.ResponseWriter, r *http.Request) {
 func (h *ArticleHandler) ListArticles(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	res, err := h.articleService.ListArticles(ctx, 10, 0) // Example: limit=10, offset=0
+	if err != nil {
+		h.handler.RespondError(w, err)
+		return
+	}
+
+	h.handler.RespondJSON(w, http.StatusOK, res)
+}
+
+func (h *ArticleHandler) LanArticles(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	logger.Info("lan endpoint")
+	// 1. Extract the locale parameter from the URL path
+	lan := chi.URLParam(r, "lan")
+	if lan == "" {
+		h.handler.RespondError(w, errors.ErrBadRequest.W(" ", ""))
+		return
+	}
+
+	// 2. Pass the extracted locale string to your service
+	res, err := h.articleService.LanArticles(ctx, lan, 10, 0)
 	if err != nil {
 		h.handler.RespondError(w, err)
 		return

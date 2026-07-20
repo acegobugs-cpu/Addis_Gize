@@ -208,6 +208,7 @@ func (r *Router) setupRoutes(l *limiter.Limiter) {
 			router.Group(func(router chi.Router) {
 				router.Get("/", r.articleHandler.ListArticles)
 				router.Get("/search", r.articleHandler.SearchArticles)
+				router.Get("/lan/{lan}", r.articleHandler.LanArticles)
 				router.Get("/{id}", r.articleHandler.GetArticle)
 				router.Get("/slug/{slug}", r.articleHandler.GetArticleBySlug)
 			})

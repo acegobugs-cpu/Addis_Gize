@@ -259,6 +259,59 @@ func (r *ArticleRepository) List(ctx context.Context, limit, offset int) ([]*ent
 	return articles, nil
 }
 
+func (r *ArticleRepository) ListStories(ctx context.Context, lan string, limit, offset int) ([]*entities.Story, error) {
+	query := `
+        SELECT 
+            a.id, 
+            a.tag, 
+            a.media, 
+            a.published_at, 
+            a.updated_at,
+            al.title,
+            al.slug,
+            al.description,
+            al.content
+        FROM articles a
+        INNER JOIN article_locale al ON a.id = al.article_id
+        WHERE al.locale = $1
+        ORDER BY a.published_at DESC 
+        LIMIT $2 OFFSET $3
+    `
+	rows, err := r.db.Query(ctx, query, lan, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list articles: %w", err)
+	}
+	defer rows.Close()
+
+	var articles []*entities.Story
+	for rows.Next() {
+		article := &entities.Story{}
+
+		// Scan both base article fields and localized fields
+		err := rows.Scan(
+			&article.ID,
+			&article.Tag,
+			&article.Media,
+			&article.PublishedAt,
+			&article.UpdatedAt,
+			&article.Title,       // Added from article_locale
+			&article.Slug,        // Added from article_locale
+			&article.Description, // Added from article_locale
+			&article.Content,     // Added from article_locale
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan article: %w", err)
+		}
+		articles = append(articles, article)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows error: %w", err)
+	}
+
+	return articles, nil
+}
+
 func (r *ArticleRepository) Search(ctx context.Context, query string, limit, offset int) ([]*entities.Article, error) {
 	searchQuery := `
 		SELECT DISTINCT a.id, a.tag, a.media, a.published_at, a.updated_at

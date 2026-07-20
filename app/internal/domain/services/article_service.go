@@ -105,6 +105,15 @@ func (s *ArticleService) ListArticles(ctx context.Context, limit, offset int) ([
 	return articles, nil
 }
 
+// ListArticles lists all articles with pagination
+func (s *ArticleService) LanArticles(ctx context.Context, lan string, limit, offset int) ([]*entities.Story, error) {
+	articles, err := s.articleRepo.ListStories(ctx, lan, limit, offset)
+	if err != nil {
+		return nil, errors.ErrInternalServer.W("Failed to list articles", "")
+	}
+	return articles, nil
+}
+
 // SearchArticles searches articles by query
 func (s *ArticleService) SearchArticles(ctx context.Context, query string, limit, offset int) ([]*entities.Article, error) {
 	articles, err := s.articleRepo.Search(ctx, query, limit, offset)
