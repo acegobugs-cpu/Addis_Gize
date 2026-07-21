@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	pgxuuid "github.com/vgarvardt/pgx-google-uuid/v5"
 
 	"app/internal/pkg/config"
 	"app/internal/pkg/logger"
@@ -17,7 +18,6 @@ type Postgres struct {
 	pool *pgxpool.Pool
 }
 
-// NewPostgres creates a new PostgreSQL connection
 func NewPostgres(cfg *config.DatabaseConfig) (*Postgres, error) {
 	connString := fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
@@ -34,6 +34,12 @@ func NewPostgres(cfg *config.DatabaseConfig) (*Postgres, error) {
 	config.MaxConnLifetime = time.Duration(cfg.ConnMaxLifetime) * time.Second
 	config.MaxConnIdleTime = time.Duration(cfg.ConnMaxLifetime) * time.Second
 	config.HealthCheckPeriod = 1 * time.Minute
+
+	// Register google/uuid support for binary format scanning
+	config.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		pgxuuid.Register(conn.TypeMap())
+		return nil
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

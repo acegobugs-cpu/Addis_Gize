@@ -100,6 +100,8 @@ type AuthConfig struct {
 }
 
 type StorageConfig struct {
+	AccessKey   string `mapstructure:"access_key"`
+	SecretKey   string `mapstructure:"secret_key"`
 	Endpoint    string `mapstructure:"endpoint"`
 	BucketName  string `mapstructure:"bucket_name"`
 	Region      string `mapstructure:"region"`

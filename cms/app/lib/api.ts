@@ -14,6 +14,7 @@ import {
   ArticleUpdate,
   Invite,
 } from "../types/types";
+import { MediaItemRes } from "../(main)/files/page";
 
 // 1. Mirror your Go AppError struct in TypeScript
 interface AppResponse<T = any> {
@@ -207,7 +208,7 @@ export async function deleteCategory(id: number) {
 
 export async function getMedia() {
   const res = await backend.get("/uploads");
-  return handleResponse<{ files: string[] }>(res);
+  return handleResponse<{files:any[]}>(res);
 }
 
 export async function delMedia(filename: string) {
@@ -222,6 +223,59 @@ export async function delMedia(filename: string) {
  */
 export async function uploadFile(formData: FormData) {
   // Since BackendClient post takes (path, body, options), pass formData via custom options boundary
-  const res = await backend.post("/upload", undefined, { body: formData });
+  const res = await backend.post("/uploads", undefined, { body: formData });
   return handleResponse<any>(res);
+}
+
+export async function putMedia(formData: FormData) {
+  const file = formData.get("file") as File;
+  if (!file) throw new Error("No file provided");
+
+  // 1. Ask Go backend for Presigned Upload URL
+  // Replace backend endpoint with your actual Go server URL (e.g. http://localhost:8080)
+  const presignRes = await backend.post("/uploads/presignedUrl", undefined, {
+    body: JSON.stringify({
+      filename: file.name,
+      content_type: file.type || "application/octet-stream",
+      type: file.type,
+      source: "bucket",
+    }),
+  });
+
+  if (!presignRes.ok) {
+    throw new Error("Failed to retrieve presigned URL from backend");
+  }
+
+  const result = await presignRes.json();
+  const { upload_url, media_id, storage_key } = result?.data;
+
+  // 3. Convert File to ArrayBuffer and stream to S3 / LocalStack
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  const uploadRes = await fetch(upload_url, {
+    method: "PUT",
+    headers: {
+      "Content-Type": file.type || "application/octet-stream",
+      "Content-Length": buffer.length.toString(),
+    },
+    body: buffer,
+  });
+
+  if (!uploadRes.ok) {
+    const errText = await uploadRes.text();
+    throw new Error(`S3 upload failed (${uploadRes.status}): ${errText}`);
+  }
+
+  // 4. Return result safely to Client Component without exposing presigned URLs
+  return {
+    success: true,
+    mediaId: media_id,
+    storageKey: storage_key,
+  };
+}
+
+export async function confirmSave(keys : string[]){
+  const res = await backend.post("/uploads/confirm", undefined, {body: JSON.stringify({storageKeys: keys})})
+  return await res.json()
 }

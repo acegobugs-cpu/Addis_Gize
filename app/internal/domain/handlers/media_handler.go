@@ -1,32 +1,37 @@
 package handlers
 
 import (
+	"app/internal/domain/appContext"
 	"app/internal/domain/services"
+	"app/internal/pkg/errors"
 	"encoding/json"
-	"errors"
+	errs "errors"
 	"io"
 	"net/http"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 type MediaHandler struct {
-	mediaService services.MediaService
+	handler      *Handler
+	mediaService *services.MediaService
 }
 
-func NewMediaHandler(mediaService services.MediaService) *MediaHandler {
-	return &MediaHandler{mediaService: mediaService}
+func NewMediaHandler(mediaService *services.MediaService) *MediaHandler {
+	return &MediaHandler{
+		handler:      NewHandler(),
+		mediaService: mediaService}
 }
 
 func (h *MediaHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// 0. Extract user context (equivalent to Depends(get_current_user))
 	// Assumes your authentication middleware sets a "user" context value
-	userID := ctx.Value("user_id")
-	if userID == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	userID, ok := appContext.GetUserID(ctx)
+	if !ok || userID == uuid.Nil {
+		h.handler.RespondError(w, errors.ErrUnauthorized.W("Unauthorized Access", "No user context found"))
 		return
 	}
 
@@ -57,11 +62,11 @@ func (h *MediaHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 	// 3. Call Service Layer
 	media, err := h.mediaService.Upload(ctx, file, header.Filename, header.Header.Get("Content-Type"), reqData)
 	if err != nil {
-		if errors.Is(err, services.ErrFileTooLarge) {
+		if errs.Is(err, services.ErrFileTooLarge) {
 			http.Error(w, err.Error(), http.StatusRequestEntityTooLarge) // 413
 			return
 		}
-		if errors.Is(err, services.ErrStorageError) {
+		if errs.Is(err, services.ErrStorageError) {
 			http.Error(w, err.Error(), http.StatusInternalServerError) // 500
 			return
 		}
@@ -79,14 +84,14 @@ func (h *MediaHandler) ListUploadedFiles(w http.ResponseWriter, r *http.Request)
 	ctx := r.Context()
 
 	// // 1. Extract user context (Depends(get_current_user) equivalent)
-	// userID := ctx.Value("user_id")
-	// if userID == nil {
-	// 	http.Error(w, "Unauthorized", http.StatusUnauthorized)
-	// 	return
-	// }
+	userID, ok := appContext.GetUserID(ctx)
+	if !ok || userID == uuid.Nil {
+		h.handler.RespondError(w, errors.ErrUnauthorized.W("Unauthorized Access", "No user context found"))
+		return
+	}
 
 	// 2. Call Service Layer
-	res, err := h.mediaService.ListUploadedFiles(ctx)
+	res, err := h.mediaService.ListUploadedFiles(ctx, 20, 1)
 	if err != nil {
 		http.Error(w, "Failed to retrieve file list", http.StatusInternalServerError)
 		return
@@ -113,7 +118,7 @@ func (h *MediaHandler) GetFile(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// Type-assert AWS API specific errors to match Python's ClientError behavior
 		var noSuchKey *types.NoSuchKey
-		if errors.As(err, &noSuchKey) {
+		if errs.As(err, &noSuchKey) {
 			http.Error(w, "File not found", http.StatusNotFound) // 404
 			return
 		}
@@ -191,4 +196,66 @@ func (h *MediaHandler) DeleteFile(w http.ResponseWriter, r *http.Request) {
 
 	// 204 No Content
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *MediaHandler) GetPresignedUploadURL(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// 1. Extract authenticated user ID from context (injected by Auth Middleware)
+	userID, ok := appContext.GetUserID(ctx)
+	if !ok || userID == uuid.Nil {
+		h.handler.RespondError(w, errors.ErrUnauthorized.W("Unauthorized Access", "No user context found"))
+		return
+	}
+
+	// 2. Decode JSON body
+	var req services.GetPresignedURLRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.handler.RespondError(w, errors.ErrBadRequest)
+		return
+	}
+
+	// 3. Simple payload validation
+	if req.Filename == "" || req.ContentType == "" || req.Type == "" {
+		h.handler.RespondError(w, errors.ErrUnprocessableEntity)
+		return
+	}
+
+	// 4. Delegate to Service
+	res, err := h.mediaService.GetPresignedUploadURL(ctx, userID, req)
+	if err != nil {
+		h.handler.RespondError(w, err)
+		return
+	}
+
+	// 5. Respond with URL and Media Metadata ID
+	h.handler.RespondJSON(w, http.StatusOK, res)
+}
+
+func (h *MediaHandler) ConfirmUploads(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// 1. Extract authenticated user ID from context (injected by Auth Middleware)
+	userID, ok := appContext.GetUserID(ctx)
+	if !ok || userID == uuid.Nil {
+		h.handler.RespondError(w, errors.ErrUnauthorized.W("Unauthorized Access", "No user context found"))
+		return
+	}
+
+	// 2. Decode JSON body
+	var req services.StorageKeys
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.handler.RespondError(w, errors.ErrBadRequest)
+		return
+	}
+
+	// 4. Delegate to Service
+	res, err := h.mediaService.ConfirmUploads(ctx, req)
+	if err != nil {
+		h.handler.RespondError(w, err)
+		return
+	}
+
+	// 5. Respond with URL and Media Metadata ID
+	h.handler.RespondJSON(w, http.StatusOK, res)
 }

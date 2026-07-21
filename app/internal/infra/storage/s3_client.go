@@ -5,6 +5,9 @@ import (
 	"context"
 	"errors"
 	"io"
+	"time"
+
+	con "app/internal/pkg/config"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -14,34 +17,36 @@ import (
 )
 
 type S3Storage struct {
-	client     *s3.Client
-	bucketName string
+	client        *s3.Client
+	presignClient *s3.PresignClient // Presign client wrapper
+	bucketName    string
 }
 
-// NewS3StorageService initializes the S3 Client for either LocalStack or MinIO
-// localstackEndpoint default: "http://localhost:4566"
-// minioEndpoint default:      "http://localhost:9000"
-func NewS3Storage(ctx context.Context, endpointURL, bucketName, region string) (*S3Storage, error) {
-	// LocalStack & MinIO accept arbitrary dummy values for credentials
-	customProvider := credentials.NewStaticCredentialsProvider("mock-access-key", "mock-secret-key", "")
+func NewS3Storage(ctx context.Context, s con.StorageConfig) (*S3Storage, error) {
+	customProvider := credentials.NewStaticCredentialsProvider(s.AccessKey, s.SecretKey, "")
 
 	cfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(region),
+		config.WithRegion(s.Region),
 		config.WithCredentialsProvider(customProvider),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	// Create the S3 client specifying local endpoints and forcing path style routing
 	s3Client := s3.NewFromConfig(cfg, func(o *s3.Options) {
-		o.BaseEndpoint = aws.String(endpointURL)
-		o.UsePathStyle = true // Crucial for LocalStack/MinIO to bypass DNS bucket routing
+		if s.Endpoint != "" {
+			o.BaseEndpoint = aws.String(s.Endpoint)
+			o.UsePathStyle = true
+		}
 	})
 
+	// Initialize the PresignClient wrapping the S3 client
+	presignClient := s3.NewPresignClient(s3Client)
+
 	return &S3Storage{
-		client:     s3Client,
-		bucketName: bucketName,
+		client:        s3Client,
+		presignClient: presignClient,
+		bucketName:    s.BucketName,
 	}, nil
 }
 
@@ -120,4 +125,33 @@ func (s *S3Storage) DeleteFile(ctx context.Context, filename string) error {
 		Key:    aws.String(filename),
 	})
 	return err
+}
+
+// GetPresignedPutURL generates a temporary URL for DIRECT CLIENT UPLOADS to S3.
+// The client will perform an HTTP PUT directly to this URL.
+func (s *S3Storage) GetPresignedPutURL(ctx context.Context, filename, contentType string, expiry time.Duration) (string, error) {
+	req, err := s.presignClient.PresignPutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(s.bucketName),
+		Key:         aws.String(filename),
+		ContentType: aws.String(contentType),
+	}, s3.WithPresignExpires(expiry))
+	if err != nil {
+		return "", err
+	}
+
+	return req.URL, nil
+}
+
+// GetPresignedGetURL generates a temporary URL for SECURE DOWNLOADS/VIEWING.
+// Useful for private buckets where images shouldn't be publicly readable permanently.
+func (s *S3Storage) GetPresignedGetURL(ctx context.Context, filename string, expiry time.Duration) (string, error) {
+	req, err := s.presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.bucketName),
+		Key:    aws.String(filename),
+	}, s3.WithPresignExpires(expiry))
+	if err != nil {
+		return "", err
+	}
+
+	return req.URL, nil
 }

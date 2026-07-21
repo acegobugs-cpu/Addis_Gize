@@ -265,6 +265,8 @@ func (r *Router) setupRoutes(l *limiter.Limiter) {
 				router.Use(r.csrfProtection.Middleware)
 				router.Use(r.authMiddleware.Middleware)
 				router.Post("/", r.mediaHandler.UploadFile)
+				router.Post("/presignedUrl", r.mediaHandler.GetPresignedUploadURL)
+				router.Post("/confirm", r.mediaHandler.ConfirmUploads)
 				// router.Put("/:id")
 				// router.Delete("/:id")
 			})

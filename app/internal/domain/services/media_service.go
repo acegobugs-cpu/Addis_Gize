@@ -7,9 +7,13 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"time"
 
 	"app/internal/domain/entities"
 	"app/internal/domain/repositories"
+	"app/internal/infra/storage"
+
+	"github.com/google/uuid"
 )
 
 // DTOs matching your FastAPI MediaReq and MediaRes
@@ -23,31 +27,15 @@ type MediaUploadReq struct {
 	Credit    *string
 }
 
-type MinioService interface {
-	UploadFile(ctx context.Context, content []byte, filename, contentType string) error
-	ListFiles(ctx context.Context) ([]string, error)
-	GetFile(ctx context.Context, filename string) (io.ReadCloser, string, error)
-	CheckFileExists(ctx context.Context, filename string) (bool, error)
-	DeleteFile(ctx context.Context, filename string) error
-}
-
-type MediaService interface {
-	Upload(ctx context.Context, fileReader io.Reader, filename, contentType string, req MediaUploadReq) (*entities.Media, error)
-	ListUploadedFiles(ctx context.Context) (*MediaListRes, error) // <-- New Method
-	Download(ctx context.Context, filename string) (io.ReadCloser, string, error)
-	Replace(ctx context.Context, filename string, fileReader io.Reader, contentType string) error
-	Delete(ctx context.Context, filename string) error
-}
-
-type mediaService struct {
+type MediaService struct {
 	repo         *repositories.MediaRepository
-	minio        MinioService
+	minio        *storage.S3Storage
 	maxFileSize  int64
 	minioBaseURL string
 }
 
-func NewMediaService(repo *repositories.MediaRepository, minio MinioService, maxFile int64, minioURL string) MediaService {
-	return &mediaService{
+func NewMediaService(repo *repositories.MediaRepository, minio *storage.S3Storage, maxFile int64, minioURL string) *MediaService {
+	return &MediaService{
 		repo:         repo,
 		minio:        minio,
 		maxFileSize:  maxFile,
@@ -63,36 +51,67 @@ var (
 )
 
 type MediaListRes struct {
-	Files []string `json:"files"`
+	Files []MediaItemRes `json:"files"`
 }
 
-// Implement the new method on your mediaService struct
-func (s *mediaService) ListUploadedFiles(ctx context.Context) (*MediaListRes, error) {
-	// 1. Call S3 storage layer
-	keys, err := s.minio.ListFiles(ctx) // s.minio is your MinioService interface
+type StorageKeys struct {
+	Keys []string `json:"storageKeys"`
+}
+
+type GetPresignedURLRequest struct {
+	Filename    string `json:"filename" validate:"required"`
+	ContentType string `json:"content_type" validate:"required"` // e.g. "image/jpeg"
+	Type        string `json:"type" validate:"required"`         // e.g. "article_image", "avatar"
+	Source      string `json:"source" validate:"required"`
+}
+
+type GetPresignedURLResponse struct {
+	MediaID    string    `json:"media_id"`
+	StorageKey string    `json:"storage_key"`
+	UploadURL  string    `json:"upload_url"`
+	ExpiresAt  time.Time `json:"expires_at"`
+}
+
+type MediaItemRes struct {
+	ID        uuid.UUID `json:"id"`
+	Filename  string    `json:"filename"`
+	URL       string    `json:"url"`
+	Type      string    `json:"type"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+func (s *MediaService) ListUploadedFiles(ctx context.Context, limit, offset int) (*MediaListRes, error) {
+	mediaItems, err := s.repo.ListAttached(ctx, limit, offset)
 	if err != nil {
-		return nil, ErrStorageError
+		return nil, err
 	}
 
-	// 2. Build full URLs based on the base URL configuration
-	fileURLs := make([]string, len(keys))
-	for i, key := range keys {
-		if s.minioBaseURL != "" {
-			fileURLs[i] = s.minioBaseURL + "/" + key
-		} else {
-			fileURLs[i] = key
+	files := make([]MediaItemRes, len(mediaItems))
+	for i, m := range mediaItems {
+		// Generate a 15-minute temporary presigned download URL
+		presignedURL, err := s.minio.GetPresignedGetURL(ctx, m.StorageKey, 15*time.Minute)
+		if err != nil {
+			return nil, err
+		}
+
+		files[i] = MediaItemRes{
+			ID:        m.ID,
+			Filename:  m.FileName,
+			URL:       presignedURL,
+			Type:      m.Type,
+			CreatedAt: m.CreatedAt,
 		}
 	}
 
-	return &MediaListRes{Files: fileURLs}, nil
+	return &MediaListRes{Files: files}, nil
 }
 
-func (s *mediaService) Download(ctx context.Context, filename string) (io.ReadCloser, string, error) {
+func (s *MediaService) Download(ctx context.Context, filename string) (io.ReadCloser, string, error) {
 	// Business layer wrapper. You could add database lookups or download logging here.
 	return s.minio.GetFile(ctx, filename)
 }
 
-func (s *mediaService) Upload(ctx context.Context, fileReader io.Reader, filename, contentType string, req MediaUploadReq) (*entities.Media, error) {
+func (s *MediaService) Upload(ctx context.Context, fileReader io.Reader, filename, contentType string, req MediaUploadReq) (*entities.Media, error) {
 	var totalSize int64
 	chunkSize := 64 * 1024 // 64KB
 	buf := make([]byte, chunkSize)
@@ -135,15 +154,10 @@ func (s *mediaService) Upload(ctx context.Context, fileReader io.Reader, filenam
 
 	// 4. Save to Database
 	media := &entities.Media{
-		Name:      filename,
-		URL:       fileURL,
-		Type:      req.Type,
-		Source:    &req.Source,
-		Caption:   req.Caption,
-		Thumbnail: req.Thumbnail,
-		Controls:  req.Controls,
-		Alt:       req.Alt,
-		Credit:    req.Credit,
+		FileName:   filename,
+		StorageKey: fileURL,
+		Type:       req.Type,
+		Source:     req.Source,
 	}
 
 	if err := s.repo.Create(ctx, media); err != nil {
@@ -153,7 +167,7 @@ func (s *mediaService) Upload(ctx context.Context, fileReader io.Reader, filenam
 	return media, nil
 }
 
-func (s *mediaService) Replace(ctx context.Context, filename string, fileReader io.Reader, contentType string) error {
+func (s *MediaService) Replace(ctx context.Context, filename string, fileReader io.Reader, contentType string) error {
 	// 1. Enforce existence verification
 	exists, err := s.minio.CheckFileExists(ctx, filename)
 	if err != nil {
@@ -190,7 +204,7 @@ func (s *mediaService) Replace(ctx context.Context, filename string, fileReader 
 	return s.minio.UploadFile(ctx, content.Bytes(), filename, contentType)
 }
 
-func (s *mediaService) Delete(ctx context.Context, filename string) error {
+func (s *MediaService) Delete(ctx context.Context, filename string) error {
 	exists, err := s.minio.CheckFileExists(ctx, filename)
 	if err != nil {
 		return err
@@ -200,4 +214,72 @@ func (s *mediaService) Delete(ctx context.Context, filename string) error {
 	}
 
 	return s.minio.DeleteFile(ctx, filename)
+}
+
+func (s *MediaService) GetPresignedUploadURL(ctx context.Context, userID uuid.UUID, req GetPresignedURLRequest) (*GetPresignedURLResponse, error) {
+	// 1. Generate a unique storage key (e.g., "articles/2026/07/uuid.jpg")
+	ext := filepath.Ext(req.Filename)
+	mediaID := uuid.New()
+	now := time.Now()
+
+	storageKey := fmt.Sprintf("uploads/%s/%d/%02d/%s%s",
+		req.Type,
+		now.Year(),
+		now.Month(),
+		mediaID.String(),
+		ext,
+	)
+	// 2. Insert record into Postgres with status = 'pending'
+	media := &entities.Media{
+		ID:         mediaID,
+		Bucket:     "articles", // Add getter in S3Storage if needed
+		StorageKey: storageKey,
+		FileName:   req.Filename,
+		UploadedBy: userID,
+		Type:       req.Type,
+		Source:     req.Source,
+	}
+
+	if err := s.repo.CreatePending(ctx, media); err != nil {
+		return nil, fmt.Errorf("failed to save media metadata: %w", err)
+	}
+
+	// 3. Generate S3 Presigned PUT URL valid for 15 minutes
+	expiry := 15 * time.Minute
+	uploadURL, err := s.minio.GetPresignedPutURL(ctx, storageKey, req.ContentType, expiry)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate presigned url: %w", err)
+	}
+
+	return &GetPresignedURLResponse{
+		MediaID:    mediaID.String(),
+		StorageKey: storageKey,
+		UploadURL:  uploadURL,
+		ExpiresAt:  now.Add(expiry),
+	}, nil
+}
+
+func (s *MediaService) ConfirmUploads(ctx context.Context, req StorageKeys) ([]uuid.UUID, error) {
+	var attachedIDs []uuid.UUID
+
+	for _, key := range req.Keys {
+		// 1. Verify existence in MinIO / S3
+		exists, err := s.minio.CheckFileExists(ctx, key)
+		if err != nil {
+			return nil, fmt.Errorf("error checking file existence for %s: %w", key, err)
+		}
+		if !exists {
+			return nil, fmt.Errorf("file was not found in S3 storage: %s", key)
+		}
+
+		// 2. Update status to 'attached' in PostgreSQL
+		id, err := s.repo.Attach(ctx, key)
+		if err != nil {
+			return nil, fmt.Errorf("failed to attach media for key %s: %w", key, err)
+		}
+
+		attachedIDs = append(attachedIDs, *id)
+	}
+
+	return attachedIDs, nil
 }

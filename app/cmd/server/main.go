@@ -27,6 +27,7 @@ import (
 	"app/internal/pkg/crypto"
 	"app/internal/pkg/logger"
 	"app/internal/pkg/token"
+	"app/internal/workers"
 )
 
 func main() {
@@ -77,7 +78,7 @@ func main() {
 	}
 
 	// Initialize storage service using config
-	storageSvc, err := storage.NewS3Storage(ctx, cfg.Storage.Endpoint, cfg.Storage.BucketName, cfg.Storage.Region)
+	storageSvc, err := storage.NewS3Storage(ctx, cfg.Storage)
 	if err != nil {
 		logger.Fatal("unable to load SDK config, %v", zap.Error(err))
 	}
@@ -128,6 +129,10 @@ func main() {
 		tokenManager,
 	)
 
+	// Start Cron Worker
+	mediaWorker := workers.NewMediaCronWorker(mediaRepo, storageSvc)
+	mediaWorker.Start(ctx)
+
 	// Create HTTP server
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
@@ -144,7 +149,18 @@ func main() {
 		}
 	}()
 
-	// Graceful shutdown
+	// Graceful Shutdown handling setup
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+
+	// 🛑 BLOCK HERE: Wait until SIGINT (Ctrl+C) or SIGTERM is received
+	sig := <-quit
+	logger.Info("Shutdown signal received", zap.String("signal", sig.String()))
+
+	// 1. Stop background cron worker first (prevents new jobs from starting during shutdown)
+	mediaWorker.Stop()
+
+	// 2. Perform HTTP server & database graceful shutdown
 	GracefulShutdown(context.Background(), server, db, cfg.Server.ShutdownTimeout)
 }
 

@@ -1,25 +1,33 @@
 package entities
 
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
 // Media represents a media entity
 type Media struct {
-	ID        int64    `json:"id"`
-	Name      string   `json:"name"`
-	URL       string   `json:"url"`
-	Type      string   `json:"type"`
-	Caption   *string  `json:"caption,omitempty"`
-	Thumbnail *string  `json:"thumbnail,omitempty"`
-	Controls  *int     `json:"controls,omitempty"`
-	Source    *string  `json:"source,omitempty"`
-	Alt       *string  `json:"alt,omitempty"`
-	Credit    *string  `json:"credit,omitempty"`
+	ID          uuid.UUID  `json:"id"`
+	Bucket      string     `json:"bucket"`
+	StorageKey  string     `json:"storageKey"`
+	FileName    string     `json:"fileName"`
+	Status      string     `json:"status"`
+	UploadedBy  uuid.UUID  `json:"uploadedBy"`
+	Type        string     `json:"type"`
+	Meta        any        `json:"metaData"`
+	Source      string     `json:"source,omitempty"`
+	ThumbnailID *uuid.UUID `json:"thumbnailID"`
+	CreatedAt   time.Time  `json:"createdAt"`
+	UpdatedAt   time.Time  `json:"updatedAt"`
 }
 
 // NewMedia creates a new media entity
 func NewMedia(name, url, mediaType string) *Media {
 	return &Media{
-		Name: name,
-		URL:  url,
-		Type: mediaType,
+		FileName:   name,
+		StorageKey: url,
+		Type:       mediaType,
 	}
 }
 

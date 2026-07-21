@@ -1,6 +1,6 @@
 "use client";
 
-import { delMedia, getMedia, uploadFile } from "@/app/lib/api";
+import { confirmSave, delMedia, getMedia, putMedia, uploadFile } from "@/app/lib/api";
 import { useState, useEffect } from "react";
 
 export default function Media() {
@@ -14,10 +14,16 @@ export default function Media() {
   );
 }
 
+export interface MediaItemRes {
+	id: string;
+	filename: string;
+	url: string;
+	type: string;
+	created_at: string;
+}
+
 function UploadsEditor() {
-  const [uploadedFiles, setUploadedFiles] = useState<
-    { url: string; filename: string; size?: number }[]
-  >([]);
+  const [uploadedFiles, setUploadedFiles] = useState<MediaItemRes[]>([]);
   const [uploading, setUploading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -27,18 +33,7 @@ function UploadsEditor() {
       try {
         const response = await getMedia(); // This should return {files: string[]}
 
-        // Convert the array of URLs to objects
-        const filesWithMetadata = response.files.map((fileUrl: string) => {
-          // Extract filename from URL
-          const filename = fileUrl.split("/").pop() || fileUrl;
-          return {
-            url: fileUrl,
-            filename: filename,
-            // Note: Size is not available from the current API response
-          };
-        });
-
-        setUploadedFiles(filesWithMetadata);
+        setUploadedFiles(response.files);
       } catch (error) {
         console.error("Error fetching media:", error);
       }
@@ -47,33 +42,30 @@ function UploadsEditor() {
   }, []);
 
   const handleFileUpload = async (file: File) => {
-    const formData = new FormData();
+     const formData = new FormData();
     formData.append("file", file);
     formData.append("name", "filename");
     formData.append("type", "image");
     formData.append("source", "user");
+  try {
+    setUploading(true);
 
-    try {
-      setUploading(true);
-      const result = await uploadFile(formData);
-      alert("Upload successful: " + result);
+    // 1. Request Presigned Upload URL from your Go Backend
+    const putRes = await putMedia(formData)
+    alert(`Upload succeeded! Media ID: ${putRes.mediaId}`);
 
-      // Refresh the files list
-      const response = await getMedia();
-      const filesWithMetadata = response.files.map((fileUrl: string) => {
-        const filename = fileUrl.split("/").pop() || fileUrl;
-        return {
-          url: fileUrl,
-          filename: filename,
-        };
-      });
-      setUploadedFiles(filesWithMetadata);
-    } catch (err) {
-      alert("Uploadkkkk failed: " + (err as Error).message);
-    } finally {
-      setUploading(false);
-    }
-  };
+    const res = await confirmSave([putRes.storageKey])
+
+    // 3. Refresh files list (or append the new file with its URL)
+    const response = await getMedia();
+    setUploadedFiles(response.files);
+
+  } catch (err) {
+    alert("Upload failed: " + (err as Error).message);
+  } finally {
+    setUploading(false);
+  }
+};
 
   const toggleSelect = (fileUrl: string) => {
     setSelectedFiles((prev) =>
@@ -154,11 +146,11 @@ function UploadsEditor() {
                       src={file.url}
                       className="w-full h-32 object-cover rounded"
                       alt={file.filename}
-                      onError={(e) => {
-                        // Fallback if image fails to load
-                        (e.target as HTMLImageElement).src =
-                          "/placeholder-image.png";
-                      }}
+                      // onError={(e) => {
+                      //   // Fallback if image fails to load
+                      //   (e.target as HTMLImageElement).src =
+                      //     "/tikvah.jpg";
+                      // }}
                     />
                   )}
                   {isVideo && (
