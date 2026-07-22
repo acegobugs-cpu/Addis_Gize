@@ -6,11 +6,13 @@ CREATE TYPE media_status AS ENUM ('pending', 'attached', 'failed');
 
 CREATE TABLE IF NOT EXISTS media (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    filename VARCHAR(255) NOT NULL,
 
     -- S3 Storage Identifiers
     bucket VARCHAR(100) NOT NULL,
     storage_key VARCHAR(500) NOT NULL UNIQUE, -- e.g., "articles/2026/07/uuid.jpg"
-    filename VARCHAR(255) NOT NULL,
+    url TEXT UNIQUE,
+    
 
     -- Status & Lifecycle Management
     status media_status NOT NULL DEFAULT 'pending',
@@ -42,5 +44,8 @@ SELECT 'down SQL query';
 -- +goose StatementBegin
 
 DROP TABLE IF EXISTS media;
+
+
+DROP TYPE IF EXISTS media_status;
 
 -- +goose StatementEnd

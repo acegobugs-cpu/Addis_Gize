@@ -24,9 +24,9 @@ func (r *MediaRepository) Create(ctx context.Context, media *entities.Media) err
 	return nil
 }
 
-func (r *MediaRepository) ListAttached(ctx context.Context, limit, offset int) ([]entities.Media, error) {
+func (r *MediaRepository) ListAttached(ctx context.Context, limit, offset int) ([]entities.MediaItemRes, error) {
 	query := `
-		SELECT id, bucket, storage_key, filename, type, source, created_at
+		SELECT id, filename, url, type, source, created_at
 		FROM media
 		WHERE status = 'attached'
 		ORDER BY created_at DESC
@@ -39,15 +39,14 @@ func (r *MediaRepository) ListAttached(ctx context.Context, limit, offset int) (
 	defer rows.Close()
 
 	// Pre-allocate capacity to prevent nil JSON serialization and extra heap allocations
-	list := make([]entities.Media, 0, limit)
+	list := make([]entities.MediaItemRes, 0, limit)
 
 	for rows.Next() {
-		var m entities.Media
+		var m entities.MediaItemRes
 		err := rows.Scan(
 			&m.ID,
-			&m.Bucket,
-			&m.StorageKey,
 			&m.FileName,
+			&m.URL,
 			&m.Type,
 			&m.Source,
 			&m.CreatedAt,
@@ -69,9 +68,10 @@ func (r *MediaRepository) CreatePending(ctx context.Context, media *entities.Med
 	query := `
 		INSERT INTO media (
 			id,
+			filename,
 			bucket,
 			storage_key,
-			filename,
+			url,
 			status,
 			uploaded_by,
 			type,
@@ -80,7 +80,7 @@ func (r *MediaRepository) CreatePending(ctx context.Context, media *entities.Med
 			created_at,
 			updated_at
 		) VALUES (
-			$1, $2, $3, $4, 'pending', $5, $6, $7, $8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+			$1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 		)
 			RETURNING id
 	`
@@ -89,9 +89,10 @@ func (r *MediaRepository) CreatePending(ctx context.Context, media *entities.Med
 		ctx,
 		query,
 		media.ID,
+		media.FileName,
 		media.Bucket,
 		media.StorageKey,
-		media.FileName,
+		media.URL,
 		media.UploadedBy,
 		media.Type,
 		media.Source,

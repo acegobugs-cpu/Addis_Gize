@@ -1,5 +1,6 @@
 'use client';
 import { getMedia, uploadFile } from "@/app/lib/api";
+import { MediaItemRes } from "@/app/types/types";
 import {useState, useEffect} from "react";
 
 // ---------------------------------------------------------------------------
@@ -14,7 +15,7 @@ export function MediaWindow({ editor, onClose }: MediaWindowProps) {
   const [tab, setTab] = useState<"image" | "video" | "embed">("image");
   const [url, setUrl] = useState("");
   const [caption, setCaption] = useState("");
-  const [media, setMedia] = useState<string[]>([]);
+  const [media, setMedia] = useState<MediaItemRes[]>([]);
 
   useEffect(() => {
     const fetchUploadedFiles = async () => {
@@ -30,6 +31,7 @@ export function MediaWindow({ editor, onClose }: MediaWindowProps) {
   }, []);
 
   const insert = (src: string) => {
+    console.log("image selected",src)
     if (!src) return;
     if (tab === "image") {
       editor.chain().focus().insertImage({ src, caption }).run();
@@ -141,13 +143,13 @@ export function MediaWindow({ editor, onClose }: MediaWindowProps) {
                 {media.map((file, i) => (
                   <div
                     key={i}
-                    onMouseDown={() => insert(file)}
+                    onMouseDown={() => insert(file.url)}
                     className="cursor-pointer border border-gray-200 rounded-md overflow-hidden hover:opacity-80 hover:ring-2 hover:ring-[#1a73e8] aspect-square"
                   >
                     {tab === "image" ? (
-                      <img src={file} className="w-full h-full object-cover" />
+                      <img src={file.url} className="w-full h-full object-cover" />
                     ) : (
-                      <video src={file} className="w-full h-full object-cover" />
+                      <video src={file.url} className="w-full h-full object-cover" />
                     )}
                   </div>
                 ))}

@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { apiClient } from "@/app/lib/api";
 import { useAuth } from "@/app/components/AuthContext";
-import { User, Email } from "@/app/types/types";
+import { User } from "@/app/types/types";
+import { deleteUser, getUsers, updateUser } from "@/app/lib/api";
 
 interface UpdateFormData {
   fname: string;
@@ -21,11 +21,11 @@ export default function AuthorizeEmail() {
   const router = useRouter();
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
-  useEffect(() => {
-    if (!user) {
-      router.push("/login");
-    }
-  }, [user, router]);
+  // useEffect(() => {
+  //   if (!user) {
+  //     router.push("/login");
+  //   }
+  // }, [user, router]);
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -57,7 +57,7 @@ function UserList({ onEditUser }: UserListProps) {
 
   const fetchUsers = async () => {
     try {
-      const usersData = await apiClient.getUsers();
+      const usersData = await getUsers();
       setUsers(usersData);
     } catch {
       setError("Failed to fetch users");
@@ -71,7 +71,7 @@ function UserList({ onEditUser }: UserListProps) {
   const handleDelete = async (id: number) => {
     if (confirm("Are you sure you want to delete this user?")) {
       try {
-        await apiClient.deleteUser(id);
+        await deleteUser(id);
         setUsers((prev) => prev.filter((user) => user.id !== id));
       } catch {
         setError("Failed to delete user");
@@ -174,7 +174,7 @@ function UpdateForm({ user, onCancel, onSaved }: UpdateFormProps) {
       delete (submitData as any).password;
     }
     try {
-      await apiClient.updateUser(user.id, submitData);
+      await updateUser(user.id, submitData);
       onSaved();
       onCancel();
     } catch (err) {

@@ -230,30 +230,91 @@ func (r *ArticleRepository) Delete(ctx context.Context, id uuid.UUID) error {
 }
 
 func (r *ArticleRepository) List(ctx context.Context, limit, offset int) ([]*entities.Article, error) {
+	// 1. Query selecting columns for both Article and ArticleLocale
 	query := `
-		SELECT id, tag, media, published_at, updated_at
-		FROM articles ORDER BY published_at DESC LIMIT $1 OFFSET $2
+		SELECT 
+			a.id, 
+			a.tag, 
+			a.media, 
+			al.id,
+			al.article_id,
+			al.locale,
+			al.title,
+			al.slug,
+			al.description,
+			al.content,
+			al.published_at, 
+			al.updated_at
+		FROM articles a
+		INNER JOIN article_locale al ON a.id = al.article_id
+		ORDER BY al.published_at DESC 
+		LIMIT $1 OFFSET $2
 	`
+
 	rows, err := r.db.Query(ctx, query, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list articles: %w", err)
 	}
 	defer rows.Close()
 
-	var articles []*entities.Article
+	// Map to track unique articles by UUID to prevent duplicates from JOIN
+	articleMap := make(map[uuid.UUID]*entities.Article)
+	var orderedIDs []uuid.UUID
+
 	for rows.Next() {
-		article := &entities.Article{}
+		var (
+			articleID  uuid.UUID
+			tag        string
+			media      map[string]any
+			localeItem entities.ArticleLocale
+		)
+
+		// 2. Scan ALL 12 selected columns in exact order
 		err := rows.Scan(
-			&article.ID,
-			&article.Tag,
-			&article.Media,
-			&article.PublishedAt,
-			&article.UpdatedAt,
+			&articleID,
+			&tag,
+			&media,
+			&localeItem.ID,
+			&localeItem.ArticleID,
+			&localeItem.Locale,
+			&localeItem.Title,
+			&localeItem.Slug,
+			&localeItem.Description,
+			&localeItem.Content,
+			&localeItem.PublishedAt,
+			&localeItem.UpdatedAt,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to scan article: %w", err)
+			return nil, fmt.Errorf("failed to scan article row: %w", err)
 		}
-		articles = append(articles, article)
+
+		// 3. Group locales into the parent Article
+		article, exists := articleMap[articleID]
+		if !exists {
+			article = &entities.Article{
+				ID:           articleID,
+				Tag:          tag,
+				Media:        media,
+				PublishedAt:  localeItem.PublishedAt,
+				UpdatedAt:    localeItem.UpdatedAt,
+				Translations: []*entities.ArticleLocale{},
+			}
+			articleMap[articleID] = article
+			orderedIDs = append(orderedIDs, articleID)
+		}
+
+		// Append locale to the article's Translations slice
+		article.Translations = append(article.Translations, &localeItem)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration error: %w", err)
+	}
+
+	// 4. Preserve SQL ORDER BY sequence when building final slice
+	articles := make([]*entities.Article, 0, len(orderedIDs))
+	for _, id := range orderedIDs {
+		articles = append(articles, articleMap[id])
 	}
 
 	return articles, nil
@@ -265,8 +326,8 @@ func (r *ArticleRepository) ListStories(ctx context.Context, lan string, limit, 
             a.id, 
             a.tag, 
             a.media, 
-            a.published_at, 
-            a.updated_at,
+            al.published_at, 
+            al.updated_at,
             al.title,
             al.slug,
             al.description,

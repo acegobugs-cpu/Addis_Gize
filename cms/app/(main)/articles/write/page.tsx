@@ -151,9 +151,10 @@ export default function ArticleForm() {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Categories</label>
             <Select
+              instanceId="category-select"
               isMulti
               options={categoryOptions}
-              value={categoryOptions.filter((opt) => formData.category_ids.includes(opt.value))}
+              value={categoryOptions.filter((opt) => formData.category_ids.includes(opt?.value))}
               onChange={(selected) =>
                 setFormData({
                   ...formData,

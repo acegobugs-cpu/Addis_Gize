@@ -9,9 +9,10 @@ import (
 // Media represents a media entity
 type Media struct {
 	ID          uuid.UUID  `json:"id"`
+	FileName    string     `json:"fileName"`
 	Bucket      string     `json:"bucket"`
 	StorageKey  string     `json:"storageKey"`
-	FileName    string     `json:"fileName"`
+	URL         string     `json:"url"`
 	Status      string     `json:"status"`
 	UploadedBy  uuid.UUID  `json:"uploadedBy"`
 	Type        string     `json:"type"`
@@ -20,6 +21,15 @@ type Media struct {
 	ThumbnailID *uuid.UUID `json:"thumbnailID"`
 	CreatedAt   time.Time  `json:"createdAt"`
 	UpdatedAt   time.Time  `json:"updatedAt"`
+}
+
+type MediaItemRes struct {
+	ID        uuid.UUID `json:"id"`
+	FileName  string    `json:"fileName"`
+	URL       string    `json:"url"`
+	Type      string    `json:"type"`
+	Source    string    `json:"source"`
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 // NewMedia creates a new media entity

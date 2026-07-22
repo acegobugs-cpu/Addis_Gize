@@ -17,10 +17,7 @@ import {
 import Link from "next/link";
 import { addLocale, deleteArticle, deleteLocale, getArticles, getCategories, updateArticle } from "@/app/lib/api";
 
-const TextEditor = dynamic(() => import("../../components/textEditor"), {
-  ssr: false,
-  loading: () => <div>Loading editor...</div>,
-});
+import TextEditor, { TextEditorRef } from "../../components/editor/textEditor";
 
 export default function Articles() {
   const [articleAdd, setArticleAdd] = useState(false);
@@ -32,7 +29,7 @@ export default function Articles() {
   const [showLocaleModal, setShowLocaleModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [currentArticle, setCurrentArticle] = useState<Article | null>(null);
-  const [lan, setLan] = useState("om");
+  const [lan, setLan] = useState("am");
   const articleRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const { user } = useAuth();
 
@@ -45,8 +42,7 @@ export default function Articles() {
       const res = await getArticles();
       if (res.data?.length){
          setArticles(res.data);
-         console.log("kkk",res.data)
-        console.log(articles)
+         console.log("articles", res.data);
       }
       setLoading(false);
     } catch (error) {
@@ -58,8 +54,10 @@ export default function Articles() {
 
   const refreshArticles = async () => {
     try {
-      const data = await getArticles();
-      setArticles(data);
+      const res = await getArticles();
+      if (res.data?.length){
+         setArticles(res.data);
+      }
     } catch (error) {
       setError("Failed to refresh articles");
     }
@@ -125,12 +123,24 @@ export default function Articles() {
       <div className="w-full py-8">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-serif font-bold">Articles</h1>
-          <Link
-            href="/articles/write"
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
-          >
-            Write Article +
+          <div className="flex space-x-6">
+            <select
+              value={lan}
+              onChange={(e) => setLan(e.target.value)}
+              className="rounded-md text-sm hidden sm:block"
+            >
+              <option value="om">om</option>
+              <option value="am">am</option>
+              <option value="en">en</option>
+              <option value="sw">sw</option>
+            </select>
+            <Link
+              href="/articles/write"
+              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
+            >
+              Write Article +
           </Link>
+          </div>
         </div>
 
         {loading ? (
@@ -145,17 +155,6 @@ export default function Articles() {
                 }}
                 className="relative bg-white rounded-lg shadow-lg p-4 hover:shadow-xl transition-shadow"
               >
-                <select
-                  value={lan}
-                  onChange={(e) => setLan(e.target.value)}
-                  className="absolute top-2 right-12 p-1 rounded-md text-sm hidden sm:block"
-                >
-                  <option value="om">om</option>
-                  <option value="am">am</option>
-                  <option value="en">en</option>
-                  <option value="sw">sw</option>
-                </select>
-
                 <button
                   onClick={(e) => openDialog(article, e)}
                   className="absolute top-2 right-2 text-gray-600 rounded p-1 hover:bg-gray-100 transition-colors"
@@ -438,7 +437,8 @@ function EditArticleModal({
     const fetchCategories = async () => {
       try {
         const categoriesData = await getCategories();
-        setCategories(categoriesData);
+        console.log(categoriesData);
+        if (categoriesData)setCategories(categoriesData?.data);
       } catch (err) {
         setError("Failed to load categories");
       }

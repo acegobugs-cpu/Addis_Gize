@@ -51,7 +51,7 @@ var (
 )
 
 type MediaListRes struct {
-	Files []MediaItemRes `json:"files"`
+	Files []entities.MediaItemRes `json:"files"`
 }
 
 type StorageKeys struct {
@@ -72,38 +72,30 @@ type GetPresignedURLResponse struct {
 	ExpiresAt  time.Time `json:"expires_at"`
 }
 
-type MediaItemRes struct {
-	ID        uuid.UUID `json:"id"`
-	Filename  string    `json:"filename"`
-	URL       string    `json:"url"`
-	Type      string    `json:"type"`
-	CreatedAt time.Time `json:"createdAt"`
-}
-
 func (s *MediaService) ListUploadedFiles(ctx context.Context, limit, offset int) (*MediaListRes, error) {
 	mediaItems, err := s.repo.ListAttached(ctx, limit, offset)
 	if err != nil {
 		return nil, err
 	}
 
-	files := make([]MediaItemRes, len(mediaItems))
-	for i, m := range mediaItems {
-		// Generate a 15-minute temporary presigned download URL
-		presignedURL, err := s.minio.GetPresignedGetURL(ctx, m.StorageKey, 15*time.Minute)
-		if err != nil {
-			return nil, err
-		}
+	// files := make([]MediaItemRes, len(mediaItems))
+	// for i, m := range mediaItems {
+	// 	// Generate a 15-minute temporary presigned download URL
+	// 	presignedURL, err := s.minio.GetPresignedGetURL(ctx, m.StorageKey, 15*time.Minute)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
 
-		files[i] = MediaItemRes{
-			ID:        m.ID,
-			Filename:  m.FileName,
-			URL:       presignedURL,
-			Type:      m.Type,
-			CreatedAt: m.CreatedAt,
-		}
-	}
+	// 	files[i] = MediaItemRes{
+	// 		ID:        m.ID,
+	// 		Filename:  m.FileName,
+	// 		URL:       presignedURL,
+	// 		Type:      m.Type,
+	// 		CreatedAt: m.CreatedAt,
+	// 	}
+	// }
 
-	return &MediaListRes{Files: files}, nil
+	return &MediaListRes{Files: mediaItems}, nil
 }
 
 func (s *MediaService) Download(ctx context.Context, filename string) (io.ReadCloser, string, error) {
@@ -229,12 +221,14 @@ func (s *MediaService) GetPresignedUploadURL(ctx context.Context, userID uuid.UU
 		mediaID.String(),
 		ext,
 	)
+	url := fmt.Sprintf("%s/%s", s.minioBaseURL, storageKey)
 	// 2. Insert record into Postgres with status = 'pending'
 	media := &entities.Media{
 		ID:         mediaID,
+		FileName:   req.Filename,
 		Bucket:     "articles", // Add getter in S3Storage if needed
 		StorageKey: storageKey,
-		FileName:   req.Filename,
+		URL:        url,
 		UploadedBy: userID,
 		Type:       req.Type,
 		Source:     req.Source,

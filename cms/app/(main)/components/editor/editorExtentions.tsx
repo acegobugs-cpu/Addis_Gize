@@ -343,7 +343,7 @@ export const MediaBlock = Node.create({
     ];
   },
 
-  renderHTML({ HTMLAttributes }) {
+renderHTML({ HTMLAttributes }) {
     const { kind, src, poster, caption, controls, autoplay, loop, alt, items } =
       HTMLAttributes;
 
@@ -354,27 +354,27 @@ export const MediaBlock = Node.create({
       if (caption) {
         children.push(["figcaption", {}, caption]);
       }
-      return ["figure", mergeAttributes({ "data-media": "image" }), children];
+      // Spread children into the parent tuple
+      return ["figure", mergeAttributes({ "data-media": "image" }), ...children];
     }
 
     if (kind === "video") {
+      const videoAttrs: Record<string, any> = {
+        src,
+        poster,
+        style: "width:100%;height:auto;display:block;",
+      };
+      if (controls) videoAttrs.controls = "";
+      if (autoplay) videoAttrs.autoplay = "";
+      if (loop) videoAttrs.loop = "";
+
       const children: any[] = [
-        [
-          "video",
-          mergeAttributes({
-            src,
-            poster,
-            controls,
-            autoplay,
-            loop,
-            style: "width:100%;height:auto;display:block;",
-          }),
-        ],
+        ["video", mergeAttributes(videoAttrs)],
       ];
       if (caption) {
         children.push(["figcaption", {}, caption]);
       }
-      return ["figure", mergeAttributes({ "data-media": "video" }), children];
+      return ["figure", mergeAttributes({ "data-media": "video" }), ...children];
     }
 
     if (kind === "embed") {
@@ -386,13 +386,15 @@ export const MediaBlock = Node.create({
             frameborder: "0",
             allowfullscreen: "true",
             sandbox: "allow-scripts allow-same-origin allow-presentation",
+            style: "width:100%;aspect-ratio:16/9;border:0;",
           }),
         ],
       ];
       if (caption) {
         children.push(["figcaption", {}, caption]);
       }
-      return ["figure", mergeAttributes({ "data-media": "embed" }), children];
+      // Spread children into the parent tuple
+      return ["figure", mergeAttributes({ "data-media": "embed" }), ...children];
     }
 
     if (kind === "gallery") {
@@ -406,12 +408,12 @@ export const MediaBlock = Node.create({
       if (caption) {
         children.push(["figcaption", {}, caption]);
       }
-      return ["figure", mergeAttributes({ "data-media": "gallery" }), children];
+      return ["figure", mergeAttributes({ "data-media": "gallery" }), ...children];
     }
 
-    return ["figure", mergeAttributes({ "data-media": "unknown" }), 0];
+    return ["figure", mergeAttributes({ "data-media": "unknown" })];
   },
-
+  
   addCommands() {
     return {
       insertImage:

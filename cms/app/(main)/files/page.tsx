@@ -1,6 +1,7 @@
 "use client";
 
 import { confirmSave, delMedia, getMedia, putMedia, uploadFile } from "@/app/lib/api";
+import { MediaItemRes } from "@/app/types/types";
 import { useState, useEffect } from "react";
 
 export default function Media() {
@@ -14,14 +15,6 @@ export default function Media() {
   );
 }
 
-export interface MediaItemRes {
-	id: string;
-	filename: string;
-	url: string;
-	type: string;
-	created_at: string;
-}
-
 function UploadsEditor() {
   const [uploadedFiles, setUploadedFiles] = useState<MediaItemRes[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -33,7 +26,7 @@ function UploadsEditor() {
       try {
         const response = await getMedia(); // This should return {files: string[]}
 
-        setUploadedFiles(response.files);
+        setUploadedFiles(response.files.map((file) => file));
       } catch (error) {
         console.error("Error fetching media:", error);
       }
@@ -58,7 +51,7 @@ function UploadsEditor() {
 
     // 3. Refresh files list (or append the new file with its URL)
     const response = await getMedia();
-    setUploadedFiles(response.files);
+    setUploadedFiles(response.files.map((file) => file));
 
   } catch (err) {
     alert("Upload failed: " + (err as Error).message);
@@ -126,9 +119,9 @@ function UploadsEditor() {
           {uploadedFiles.length > 0 ? (
             uploadedFiles.map((file, index) => {
               const isImage = /\.(png|jpe?g|gif|bmp|webp)$/i.test(
-                file.filename,
+                file.fileName,
               );
-              const isVideo = /\.(mp4|webm|ogg|mov|avi)$/i.test(file.filename);
+              const isVideo = /\.(mp4|webm|ogg|mov|avi)$/i.test(file.fileName);
               const isSelected = selectedFiles.includes(file.url);
 
               return (
@@ -145,7 +138,7 @@ function UploadsEditor() {
                     <img
                       src={file.url}
                       className="w-full h-32 object-cover rounded"
-                      alt={file.filename}
+                      alt={file.fileName}
                       // onError={(e) => {
                       //   // Fallback if image fails to load
                       //   (e.target as HTMLImageElement).src =
@@ -172,9 +165,9 @@ function UploadsEditor() {
                   <div className="mt-2">
                     <p
                       className="text-xs text-gray-600 truncate"
-                      title={file.filename}
+                      title={file.fileName}
                     >
-                      {file.filename}
+                      {file.fileName}
                     </p>
                     {/* Removed size display since it's not in the API response */}
                   </div>
@@ -208,7 +201,7 @@ function UploadsEditor() {
 
 interface SelectedMediaProps {
   files: string[];
-  uploadedFiles: { url: string; filename: string; size?: number }[];
+  uploadedFiles: MediaItemRes[];
   onClose: () => void;
   onConfirm: () => void;
 }
@@ -238,9 +231,9 @@ function SelectedMedia({
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {selectedFileData.map((file, index) => {
               const isImage = /\.(png|jpe?g|gif|bmp|webp)$/i.test(
-                file.filename,
+                file.fileName,
               );
-              const isVideo = /\.(mp4|webm|ogg|mov|avi)$/i.test(file.filename);
+              const isVideo = /\.(mp4|webm|ogg|mov|avi)$/i.test(file.fileName);
 
               return (
                 <div key={index} className="border border-gray-200 rounded p-2">
@@ -250,7 +243,7 @@ function SelectedMedia({
                         file.url
                       }`}
                       className="w-full h-20 object-cover rounded"
-                      alt={file.filename}
+                      alt={file.fileName}
                     />
                   )}
                   {isVideo && (
@@ -270,9 +263,9 @@ function SelectedMedia({
                   )}
                   <p
                     className="text-xs text-gray-600 truncate mt-1"
-                    title={file.filename}
+                    title={file.fileName}
                   >
-                    {file.filename}
+                    {file.fileName}
                   </p>
                 </div>
               );

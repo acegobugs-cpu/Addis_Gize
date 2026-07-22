@@ -1,6 +1,6 @@
 'use client';
 
-import { apiClient } from "@/app/lib/api";
+import { deleteEmails, getInvites, invite } from "@/app/lib/api";
 import { Invite } from "@/app/types/types";
 import { useEffect, useState } from "react";
 
@@ -29,7 +29,7 @@ export default function EmailList() {
 
   const fetchEmails = async () => {
     try {
-      const invitesData = await apiClient.getInvites();
+      const invitesData = await getInvites();
       setInvites(invitesData.data);
     } catch {
       setError("Failed to fetch emails");
@@ -69,7 +69,7 @@ export default function EmailList() {
     
     try {
       // Sending payload matching your backend expectations
-      const res = await apiClient.invite(formData);
+      const res = await invite(formData);
       setSlug(res.id);
       setSuccess("Email authorized successfully.");
       
@@ -93,7 +93,7 @@ export default function EmailList() {
   const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this email?")) {
       try {
-        await apiClient.deleteEmails(id);
+        await deleteEmails(id);
         setInvites((prev) => prev.filter((email) => email.id !== id));
       } catch {
         setError("Failed to delete email");

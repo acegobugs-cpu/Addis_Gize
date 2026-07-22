@@ -13,8 +13,8 @@ import {
   ArticleTranslation,
   ArticleUpdate,
   Invite,
+  Story,
 } from "../types/types";
-import { MediaItemRes } from "../(main)/files/page";
 
 // 1. Mirror your Go AppError struct in TypeScript
 interface AppResponse<T = any> {
@@ -134,12 +134,12 @@ export async function createArticle(data: Partial<Article>) {
   return handleResponse<Article>(res);
 }
 
-export async function updateArticle(article_id: number, data: Partial<ArticleUpdate>) {
+export async function updateArticle(article_id: string, data: Partial<ArticleUpdate>) {
   const res = await backend.patch(`/articles/${article_id}`, data);
   return handleResponse<ArticleUpdate>(res);
 }
 
-export async function deleteArticle(id: number) {
+export async function deleteArticle(id: string) {
   const res = await backend.delete(`/articles/${id}`);
   return handleResponse<any>(res);
 }

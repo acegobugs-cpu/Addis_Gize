@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Media } from "@/app/types/types";
+import { Media, MediaItemRes } from "@/app/types/types";
 import { getMedia, uploadFile } from "@/app/lib/api";
 
 interface MediaBlockProps {
@@ -106,7 +106,7 @@ export default function MediaBlock({ data, onChange }: MediaBlockProps) {
             </button>
             {data.url ? (
               <p className="border border-green-500 p-2 rounded bg-green-50 text-green-700 text-sm break-all">
-                Selected: {data.url.split("/").pop()}
+                Selected: {data.url}
               </p>
             ) : (
               <p className="border border-red-500 p-2 rounded bg-red-50 text-red-700 text-sm">
@@ -126,13 +126,16 @@ function SelectMedia({
   setShowModal,
   handleFileUpload,
 }: SelectMediaProps) {
-  const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<MediaItemRes[]>([]);
   const [loading, setLoading] = useState(true);
+
+  console.log(uploadedFiles);
 
   useEffect(() => {
     const fetchUploadedFiles = async () => {
       try {
         const mediaFiles = await getMedia();
+        console.log(uploadedFiles);
         setUploadedFiles(mediaFiles.files.map((file) => file));
       } catch (error) {
         console.error("Failed to fetch uploaded files:", error);
@@ -167,25 +170,26 @@ function SelectMedia({
                 key={index}
                 className="border border-gray-300 rounded-lg p-2 cursor-pointer hover:border-blue-500 hover:shadow-md transition-all"
                 onClick={() => {
-                  onChange({ ...data, url: file, source: "local" });
+                  onChange({ ...data, url: file.url, source: "local" });
                   setShowModal(false);
                 }}
               >
                 {data.mediaType === "image" ? (
                   <img
-                    src={file}
+                    src={file.url}
                     className="w-full h-24 object-cover rounded"
                     alt="Uploaded media"
                   />
                 ) : (
                   <video
-                    src={file}
+                    src={file.url}
                     className="w-full h-24 object-cover rounded"
+                    poster={file.thumbnailUrl}
                   />
                 )}
-                <p className="text-xs text-gray-600 mt-2 truncate">
-                  {file.split("/").pop()}
-                </p>
+                {/* <p className="text-xs text-gray-600 mt-2 truncate">
+                  {file?.split("/").pop()}
+                </p> */}
               </div>
             ))}
           </div>

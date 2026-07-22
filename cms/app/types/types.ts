@@ -30,8 +30,25 @@ export interface Article {
 }
 
 export interface ArticleTranslation {
-  id: number;
-  article_id?: number;
+  id: string;
+  article_id?: string;
+  locale: string;
+  title: string;
+  slug: string;
+  description?: string;
+  content?: any; // JSON content from Tiptap editor
+  editor_id: number;
+  published_at?: string;
+  updated_at?: string;
+}
+
+export interface Story {
+  id: string;
+  article_id?: string;
+  tag: string;
+  media?: Media;
+  category_ids: string[];
+  categories: Category[];
   locale: string;
   title: string;
   slug: string;
@@ -46,7 +63,7 @@ export interface ArticleUpdate {
   id: string;
   tag: string;
   media?: Media;
-  category_ids: number[];
+  category_ids: string[];
   categories?: Category[];
   translations: Record<string, Partial<ArticleTranslation>>;
   updated_at: string;
@@ -84,6 +101,16 @@ export interface Media {
   source: "external" | "local";
   url: string;
   alt?: string;
+}
+
+export interface MediaItemRes {
+  id: string;
+  fileName: string;
+  url: string;
+  thumbnailUrl: string;
+  type: string;
+  source: string;
+  created_at: string;
 }
 
 export interface RegisterFormData {
