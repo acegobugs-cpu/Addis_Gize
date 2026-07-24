@@ -227,17 +227,17 @@ export async function uploadFile(formData: FormData) {
   return handleResponse<any>(res);
 }
 
-export async function putMedia(formData: FormData) {
-  const file = formData.get("file") as File;
-  if (!file) throw new Error("No file provided");
+export async function getPresignedUrl(metadata: {
+  filename: string;
+  contentType: string;
+}) {
+  const { filename, contentType } = metadata;
 
-  // 1. Ask Go backend for Presigned Upload URL
-  // Replace backend endpoint with your actual Go server URL (e.g. http://localhost:8080)
   const presignRes = await backend.post("/uploads/presignedUrl", undefined, {
     body: JSON.stringify({
-      filename: file.name,
-      content_type: file.type || "application/octet-stream",
-      type: file.type,
+      filename,
+      content_type: contentType || "application/octet-stream",
+      type: contentType,
       source: "bucket",
     }),
   });
@@ -247,31 +247,16 @@ export async function putMedia(formData: FormData) {
   }
 
   const result = await presignRes.json();
-  const { upload_url, media_id, storage_key } = result?.data;
+  const { upload_url, media_id, storage_key } = result?.data || {};
 
-  // 3. Convert File to ArrayBuffer and stream to S3 / LocalStack
-  const arrayBuffer = await file.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
-
-  const uploadRes = await fetch(upload_url, {
-    method: "PUT",
-    headers: {
-      "Content-Type": file.type || "application/octet-stream",
-      "Content-Length": buffer.length.toString(),
-    },
-    body: buffer,
-  });
-
-  if (!uploadRes.ok) {
-    const errText = await uploadRes.text();
-    throw new Error(`S3 upload failed (${uploadRes.status}): ${errText}`);
+  if (!upload_url) {
+    throw new Error("Presigned URL was not returned by the backend");
   }
 
-  // 4. Return result safely to Client Component without exposing presigned URLs
   return {
-    success: true,
-    mediaId: media_id,
-    storageKey: storage_key,
+    uploadUrl: upload_url as string,
+    mediaId: media_id as string,
+    storageKey: storage_key as string,
   };
 }
 

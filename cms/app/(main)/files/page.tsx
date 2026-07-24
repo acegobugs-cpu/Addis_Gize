@@ -1,6 +1,7 @@
 "use client";
 
-import { confirmSave, delMedia, getMedia, putMedia, uploadFile } from "@/app/lib/api";
+import { putMedia } from "@/app/components/utils/putMedia";
+import { confirmSave, delMedia, getMedia, uploadFile } from "@/app/lib/api";
 import { MediaItemRes } from "@/app/types/types";
 import { useState, useEffect } from "react";
 

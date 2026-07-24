@@ -28,10 +28,8 @@ export default function Panel() {
       label: "Articles",
       icon: <Newspaper size={18} />,
       links: [
-        { name: "Analytics", href: "/articles/analytics" },
         { name: "View", href: "/articles/view" },
         { name: "Write", href: "/articles/write" },
-        { name: "Manage", href: "/articles/manage" },
       ],
     },
     {
@@ -39,7 +37,6 @@ export default function Panel() {
       icon: <Group size={18} />,
       links: [
         { name: "Overview", href: "/categories" },
-        { name: "Create", href: "/categories/new" },
       ],
     },
     {
@@ -47,15 +44,14 @@ export default function Panel() {
       icon: <HardDrive size={18} />,
       links: [
         { name: "Library", href: "/files" },
-        { name: "Upload", href: "/files/upload" },
       ],
     },
     {
       label: "Users",
       icon: <Users size={18} />,
       links: [
-        { name: "Authorize", href: "/authorize-email" },
-        { name: "Permissions", href: "/users/permissions" },
+        { name: "Users", href: "/users" },
+        { name: "Authorize", href: "/users/invites" },
       ],
     },
   ];
