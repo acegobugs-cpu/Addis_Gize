@@ -1,26 +1,480 @@
 import { Extension, Node, mergeAttributes } from "@tiptap/core";
 import Document from "@tiptap/extension-document";
 import { TextSelection } from "prosemirror-state";
+import "@tiptap/core";
 
 // =============================================
-// DOCUMENT SCHEMA - FORCED CONTENT STRUCTURE
+// TYPES & MODULE AUGMENTATION
 // =============================================
-// This is Tiptap's own "forced content structure" pattern
-// (https://tiptap.dev/docs/examples/advanced/forced-content-structure):
-// the top node's `content` expression is what actually guarantees
-// "always exactly one title, then exactly one description, then the
-// body" - not a runtime check. articleTitle/articleDescription are
-// intentionally NOT part of the "block" group, so they can never be
-// matched by the body's `block+` slot, inserted mid-document, pasted
-// in twice, or converted into from the block-type dropdown.
+declare module "@tiptap/core" {
+  interface Commands<ReturnType> {
+    highlight: {
+      /** Set text highlight background color */
+      setTextHighlight: (color: string) => ReturnType;
+      /** Unset text highlight background color */
+      unsetTextHighlight: () => ReturnType;
+    };
+    fontSize: {
+      /** Set inline font size in px */
+      setFontSize: (size: string) => ReturnType;
+      /** Unset inline font size */
+      unsetFontSize: () => ReturnType;
+    };
+    imageNode: {
+      /** Insert an image node */
+      insertImage: (attrs: { src: string; alt?: string; caption?: string }) => ReturnType;
+    };
+    videoNode: {
+      /** Insert a video node */
+      insertVideo: (attrs: {
+        src: string | null;
+        poster?: string;
+        caption?: string;
+        controls?: boolean;
+        autoplay?: boolean;
+        loop?: boolean;
+      }) => ReturnType;
+    };
+    embedNode: {
+      /** Insert an embedded video / iframe node */
+      insertEmbed: (attrs: { src: string; caption?: string }) => ReturnType;
+    };
+    galleryNode: {
+      /** Insert an image gallery node */
+      insertGallery: (items: { src: string }[], caption?: string) => ReturnType;
+    };
+  }
+}
+// =============================================
+// SEPARATED MEDIA NODES
+// =============================================
+
+// 1. IMAGE NODE
+export const ImageNode = Node.create({
+  name: "imageNode",
+  group: "block",
+  atom: true,
+  selectable: true,
+  draggable: true,
+
+  addAttributes() {
+    return {
+      src: {
+        default: "",
+        parseHTML: (element) => element.querySelector("img")?.getAttribute("src") || "",
+        renderHTML: (attributes) => ({ src: attributes.src }),
+      },
+      alt: {
+        default: "",
+        parseHTML: (element) => element.querySelector("img")?.getAttribute("alt") || "",
+        renderHTML: (attributes) => (attributes.alt ? { alt: attributes.alt } : {}),
+      },
+      caption: {
+        default: "",
+        parseHTML: (element) => element.querySelector("figcaption")?.textContent || "",
+        renderHTML: (attributes) => (attributes.caption ? { "data-caption": attributes.caption } : {}),
+      },
+    };
+  },
+
+  parseHTML() {
+    return [
+      {
+        tag: 'figure[data-media="image"]',
+      },
+    ];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    const { src, alt, caption, ...rest } = HTMLAttributes;
+
+    const imgAttrs: Record<string, string> = { src: src || "" };
+    if (alt) imgAttrs.alt = alt;
+
+    const children: any[] = [["img", imgAttrs]];
+
+    if (caption) {
+      children.push(["figcaption", {}, caption]);
+    }
+
+    return [
+      "figure",
+      mergeAttributes(rest, { "data-media": "image" }),
+      ...children,
+    ];
+  },
+
+  addCommands() {
+    return {
+      insertImage:
+        (attrs: { src: string; alt?: string; caption?: string }) =>
+        ({ commands }) =>
+          commands.insertContent({
+            type: this.name,
+            attrs: {
+              src: attrs.src,
+              alt: attrs.alt || "",
+              caption: attrs.caption || "",
+            },
+          }),
+    };
+  },
+});
+
+// 2. VIDEO NODE
+export const VideoNode = Node.create({
+  name: "videoNode",
+  group: "block",
+  atom: true,
+  selectable: true,
+  draggable: true,
+
+  addAttributes() {
+    return {
+      src: {
+        default: "",
+        parseHTML: (element) => element.querySelector("video")?.getAttribute("src") || "",
+      },
+      poster: {
+        default: "",
+        parseHTML: (element) => element.querySelector("video")?.getAttribute("poster") || "",
+      },
+      caption: {
+        default: "",
+        parseHTML: (element) => element.querySelector("figcaption")?.textContent || "",
+      },
+      controls: {
+        default: true,
+        parseHTML: (element) => element.querySelector("video")?.hasAttribute("controls") ?? true,
+      },
+      autoplay: {
+        default: false,
+        parseHTML: (element) => element.querySelector("video")?.hasAttribute("autoplay") ?? false,
+      },
+      loop: {
+        default: false,
+        parseHTML: (element) => element.querySelector("video")?.hasAttribute("loop") ?? false,
+      },
+    };
+  },
+
+  parseHTML() {
+    return [
+      {
+        tag: 'figure[data-media="video"]',
+      },
+    ];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    const { src, poster, caption, controls, autoplay, loop, ...rest } = HTMLAttributes;
+
+    const videoAttrs: Record<string, any> = {
+      src: src || "",
+      style: "width:100%;height:auto;display:block;",
+    };
+
+    if (poster) videoAttrs.poster = poster;
+    if (controls) videoAttrs.controls = "";
+    if (autoplay) videoAttrs.autoplay = "";
+    if (loop) videoAttrs.loop = "";
+
+    const children: any[] = [["video", videoAttrs]];
+
+    if (caption) {
+      children.push(["figcaption", {}, caption]);
+    }
+
+    return [
+      "figure",
+      mergeAttributes(rest, { "data-media": "video" }),
+      ...children,
+    ];
+  },
+
+  addCommands() {
+    return {
+      insertVideo:
+        (attrs: {
+          src: string | null;
+          poster?: string;
+          caption?: string;
+          controls?: boolean;
+          autoplay?: boolean;
+          loop?: boolean;
+        }) =>
+        ({ commands }) =>
+          commands.insertContent({
+            type: this.name,
+            attrs: {
+              src: attrs.src || "",
+              poster: attrs.poster || "",
+              caption: attrs.caption || "",
+              controls: attrs.controls ?? true,
+              autoplay: attrs.autoplay ?? false,
+              loop: attrs.loop ?? false,
+            },
+          }),
+    };
+  },
+});
+
+// 3. EMBED NODE
+export const EmbedNode = Node.create({
+  name: "embedNode",
+  group: "block",
+  atom: true,
+  selectable: true,
+  draggable: true,
+
+  addAttributes() {
+    return {
+      src: {
+        default: "",
+        parseHTML: (element) => element.querySelector("iframe")?.getAttribute("src") || "",
+      },
+      caption: {
+        default: "",
+        parseHTML: (element) => element.querySelector("figcaption")?.textContent || "",
+      },
+    };
+  },
+
+  parseHTML() {
+    return [
+      {
+        tag: 'figure[data-media="embed"]',
+      },
+    ];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    const { src, caption, ...rest } = HTMLAttributes;
+
+    const children: any[] = [
+      [
+        "iframe",
+        {
+          src: src || "",
+          frameborder: "0",
+          allowfullscreen: "true",
+          sandbox: "allow-scripts allow-same-origin allow-presentation",
+          style: "width:100%;aspect-ratio:16/9;border:0;",
+        },
+      ],
+    ];
+
+    if (caption) {
+      children.push(["figcaption", {}, caption]);
+    }
+
+    return [
+      "figure",
+      mergeAttributes(rest, { "data-media": "embed" }),
+      ...children,
+    ];
+  },
+
+  addCommands() {
+    return {
+      insertEmbed:
+        (attrs: { src: string; caption?: string }) =>
+        ({ commands }) =>
+          commands.insertContent({
+            type: this.name,
+            attrs: {
+              src: attrs.src,
+              caption: attrs.caption || "",
+            },
+          }),
+    };
+  },
+});
+
+// 4. GALLERY NODE
+export const GalleryNode = Node.create({
+  name: "galleryNode",
+  group: "block",
+  atom: true,
+  selectable: true,
+  draggable: true,
+
+  addAttributes() {
+    return {
+      items: {
+        default: [],
+        parseHTML: (element) => {
+          const imgs = element.querySelectorAll(".gallery-grid img");
+          const items: { src: string }[] = [];
+          imgs.forEach((img) => {
+            const src = img.getAttribute("src");
+            if (src) items.push({ src });
+          });
+          return items;
+        },
+      },
+      caption: {
+        default: "",
+        parseHTML: (element) => element.querySelector("figcaption")?.textContent || "",
+      },
+    };
+  },
+
+  parseHTML() {
+    return [
+      {
+        tag: 'figure[data-media="gallery"]',
+      },
+    ];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    const { items, caption, ...rest } = HTMLAttributes;
+
+    const children: any[] = [
+      [
+        "div",
+        { class: "gallery-grid" },
+        ...(Array.isArray(items) ? items : []).map((img: any) => ["img", { src: img.src }]),
+      ],
+    ];
+
+    if (caption) {
+      children.push(["figcaption", {}, caption]);
+    }
+
+    return [
+      "figure",
+      mergeAttributes(rest, { "data-media": "gallery" }),
+      ...children,
+    ];
+  },
+
+  addCommands() {
+    return {
+      insertGallery:
+        (items: { src: string }[], caption?: string) =>
+        ({ commands }) =>
+          commands.insertContent({
+            type: this.name,
+            attrs: {
+              items,
+              caption: caption || "",
+            },
+          }),
+    };
+  },
+});
+
+// =============================================
+// HIGHLIGHT & FONT SIZE EXTENSIONS
+// =============================================
+export const Highlight = Extension.create({
+  name: "highlight",
+
+  addGlobalAttributes() {
+    return [
+      {
+        types: ["textStyle"],
+        attributes: {
+          backgroundColor: {
+            default: null,
+            parseHTML: (el) => el.style.backgroundColor || null,
+            renderHTML: (attrs) =>
+              attrs.backgroundColor
+                ? { style: `background-color: ${attrs.backgroundColor}` }
+                : {},
+          },
+        },
+      },
+    ];
+  },
+
+  addCommands() {
+    return {
+      setTextHighlight:
+        (color: string) =>
+        ({ chain }) => {
+          return chain()
+            .setMark("textStyle", {
+              backgroundColor: color,
+            })
+            .run();
+        },
+      unsetTextHighlight:
+        () =>
+        ({ chain }) => {
+          return chain()
+            .setMark("textStyle", { backgroundColor: null })
+            .removeEmptyTextStyle()
+            .run();
+        },
+    };
+  },
+});
+
+export const FontSize = Extension.create({
+  name: "fontSize",
+
+  addOptions() {
+    return {
+      types: ["textStyle"],
+    };
+  },
+
+  addGlobalAttributes() {
+    return [
+      {
+        types: this.options.types,
+        attributes: {
+          fontSize: {
+            default: null,
+            parseHTML: (element) =>
+              element.style.fontSize.replace("px", "") || null,
+            renderHTML: (attributes) => {
+              if (!attributes.fontSize) {
+                return {};
+              }
+              return { style: `font-size: ${attributes.fontSize}px` };
+            },
+          },
+        },
+      },
+    ];
+  },
+
+  addCommands() {
+    return {
+      setFontSize:
+        (size: string) =>
+        ({ chain }) => {
+          return chain().setMark("textStyle", { fontSize: size }).run();
+        },
+      unsetFontSize:
+        () =>
+        ({ chain }) => {
+          return chain()
+            .setMark("textStyle", { fontSize: null })
+            .removeEmptyTextStyle()
+            .run();
+        },
+    };
+  },
+});
+
+
+
+
+
+
+
+// =============================================
+// DOCUMENT SCHEMA & NAVIGATION HELPERS
+// =============================================
 export const ArticleDocument = Document.extend({
   content: "articleTitle articleDescription block+",
 });
 
-// Shared helper: since the schema above guarantees the doc always
-// starts with exactly [articleTitle, articleDescription, ...body],
-// we can compute every section boundary directly instead of
-// searching for nodes.
 export function getSectionPositions(doc: any) {
   const title = doc.child(0);
   const description = doc.child(1);
@@ -32,18 +486,18 @@ export function getSectionPositions(doc: any) {
     titleContentEnd: titleSize - 1,
     descriptionContentStart: titleSize + 1,
     descriptionContentEnd: titleSize + descriptionSize - 1,
-    bodyStart: titleSize + descriptionSize, // position just before the first body block
+    bodyStart: titleSize + descriptionSize,
   };
 }
 
 // =============================================
-// ARTICLE TITLE - SINGLE INSTANCE, ALWAYS FIRST
+// ARTICLE TITLE & DESCRIPTION NODES
 // =============================================
 export const ArticleTitle = Node.create({
   name: "articleTitle",
   content: "inline*",
   defining: true,
-  isolating: true, // fences backspace/join operations at its boundary
+  isolating: true,
 
   parseHTML() {
     return [{ tag: 'h1[data-type="article-title"]' }];
@@ -62,10 +516,6 @@ export const ArticleTitle = Node.create({
 
   addKeyboardShortcuts() {
     return {
-      // Enter moves down into the description instead of splitting
-      // the title into two nodes (which the schema would reject anyway).
-      // Shift-Enter still inserts a hard break inside the title, via
-      // HardBreak's own default shortcut - we only handle plain Enter.
       Enter: () => {
         const editor = this.editor;
         const { $from } = editor.state.selection;
@@ -91,9 +541,6 @@ export const ArticleTitle = Node.create({
   },
 });
 
-// =============================================
-// ARTICLE DESCRIPTION - SINGLE INSTANCE, ALWAYS SECOND
-// =============================================
 export const ArticleDescription = Node.create({
   name: "articleDescription",
   content: "block*",
@@ -117,7 +564,6 @@ export const ArticleDescription = Node.create({
 
   addKeyboardShortcuts() {
     return {
-      // Enter moves down into the body's first block.
       Enter: () => {
         const editor = this.editor;
         const { $from } = editor.state.selection;
@@ -139,9 +585,6 @@ export const ArticleDescription = Node.create({
 
         return true;
       },
-      // Backspace at the very start moves the cursor back into the
-      // title instead of trying (and failing) to merge two different
-      // node types together.
       Backspace: () => {
         const editor = this.editor;
         const { $from, empty } = editor.state.selection;
@@ -166,12 +609,6 @@ export const ArticleDescription = Node.create({
   },
 });
 
-// =============================================
-// SECTION NAVIGATION - handles the one transition that isn't owned
-// by a specific node: Backspace at the very start of the FIRST body
-// block should move the cursor back into the description, rather
-// than merging body text into it.
-// =============================================
 export const SectionNavigation = Extension.create({
   name: "sectionNavigation",
 
@@ -204,9 +641,6 @@ export const SectionNavigation = Extension.create({
   },
 });
 
-// =============================================
-// HEAD MEDIA (for featured image/video)
-// =============================================
 export const HeadMedia = Node.create({
   name: "headMedia",
   group: "block",
@@ -237,6 +671,37 @@ export const HeadMedia = Node.create({
     ];
   },
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 export const MediaBlock = Node.create({
   name: "mediaBlock",
@@ -436,7 +901,7 @@ renderHTML({ HTMLAttributes }) {
           autoplay?: boolean;
           loop?: boolean;
         }) =>
-        ({ commands }) =>
+        ({ commands }:any) =>
           commands.insertContent({
             type: this.name,
             attrs: {
@@ -467,97 +932,6 @@ renderHTML({ HTMLAttributes }) {
               items,
             },
           }),
-    };
-  },
-});
-
-export const Highlight = Extension.create({
-  name: "highlight",
-  addGlobalAttributes() {
-    return [
-      {
-        types: ["textStyle"],
-        attributes: {
-          backgroundColor: {
-            default: null,
-            parseHTML: (el) => el.style.backgroundColor || null,
-            renderHTML: (attrs) =>
-              attrs.backgroundColor
-                ? { style: `background-color: ${attrs.backgroundColor}` }
-                : {},
-          },
-        },
-      },
-    ];
-  },
-  addCommands() {
-    return {
-      setTextHighlight:
-        (color: string) =>
-        ({ chain }: any) => {
-          return chain()
-            .setMark("textStyle", {
-              backgroundColor: color,
-            })
-            .run();
-        },
-      unsetTextHighlight:
-        () =>
-        ({ chain }: any) => {
-          return chain()
-            .setMark("textStyle", { backgroundColor: null })
-            .removeEmptyTextStyle()
-            .run();
-        },
-    };
-  },
-});
-
-export const FontSize = Extension.create({
-  name: "fontSize",
-
-  addOptions() {
-    return {
-      types: ["textStyle"],
-    };
-  },
-
-  addGlobalAttributes() {
-    return [
-      {
-        types: this.options.types,
-        attributes: {
-          fontSize: {
-            default: null,
-            parseHTML: (element) =>
-              element.style.fontSize.replace("px", "") || null,
-            renderHTML: (attributes) => {
-              if (!attributes.fontSize) {
-                return {};
-              }
-              return { style: `font-size: ${attributes.fontSize}px` };
-            },
-          },
-        },
-      },
-    ];
-  },
-
-  addCommands() {
-    return {
-      setFontSize:
-        (size: string) =>
-        ({ chain }) => {
-          return chain().setMark("textStyle", { fontSize: size }).run();
-        },
-      unsetFontSize:
-        () =>
-        ({ chain }) => {
-          return chain()
-            .setMark("textStyle", { fontSize: null })
-            .removeEmptyTextStyle()
-            .run();
-        },
     };
   },
 });

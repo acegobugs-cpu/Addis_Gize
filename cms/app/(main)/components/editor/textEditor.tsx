@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { TextStyle } from "@tiptap/extension-text-style";
@@ -13,7 +13,9 @@ import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
 
 import {
-  MediaBlock,
+  ImageNode,
+  VideoNode,
+  EmbedNode,
   FontSize,
   Highlight,
 } from "./editorExtentions";
@@ -21,13 +23,15 @@ import {
 import Toolbar from "./toolBar";
 import Canvas from "./canvas";
 
-interface EditorProps {
+export type ActiveMediaType = "image" | "video" | "embed" | null;
+
+export interface EditorProps {
   initialValue?: any;
   onChange?: (json: any) => void;
 }
 
 export interface TextEditorRef {
-  getContent: () => any;   // Only main body content
+  getContent: () => any;
   editor: any;
 }
 
@@ -38,9 +42,11 @@ const TextEditor = forwardRef<TextEditorRef, EditorProps>(({ initialValue, onCha
   const [pendingFontSize, setPendingFontSize] = useState<number>(16);
   const [showFontSizeDropdown, setShowFontSizeDropdown] = useState(false);
   const [showAlignDropdown, setShowAlignDropdown] = useState(false);
-  const [showImageWindow, setShowImageWindow] = useState(false);
   const [showHighlightDropdown, setShowHighlightDropdown] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+
+  // Tracks active modal type: "image" | "video" | "embed" | null
+  const [activeMediaModal, setActiveMediaModal] = useState<ActiveMediaType>(null);
 
   const headingRef = useRef<HTMLDivElement>(null);
   const colorRef = useRef<HTMLDivElement>(null);
@@ -63,7 +69,9 @@ const TextEditor = forwardRef<TextEditorRef, EditorProps>(({ initialValue, onCha
       TextStyle,
       FontFamily,
       FontSize,
-      MediaBlock,
+      ImageNode,
+      VideoNode,
+      EmbedNode,
       Image,
       Highlight,
       Underline,
@@ -84,7 +92,6 @@ const TextEditor = forwardRef<TextEditorRef, EditorProps>(({ initialValue, onCha
     },
   });
 
-  // ====================== HELPER METHODS ======================
   const getContent = () => editor?.getJSON();
 
   useImperativeHandle(ref, () => ({
@@ -92,7 +99,6 @@ const TextEditor = forwardRef<TextEditorRef, EditorProps>(({ initialValue, onCha
     editor,
   }));
 
-  // Sync font size
   useEffect(() => {
     if (!editor) return;
     const update = () => {
@@ -160,13 +166,13 @@ const TextEditor = forwardRef<TextEditorRef, EditorProps>(({ initialValue, onCha
         showAlignDropdown={showAlignDropdown}
         setShowAlignDropdown={setShowAlignDropdown}
         alignRef={alignRef}
-        setShowImageWindow={setShowImageWindow}
+        setShowImageWindow={(type: ActiveMediaType) => setActiveMediaModal(type)}
       />
 
       <Canvas
         editor={editor}
-        showImageWindow={showImageWindow}
-        setShowImageWindow={setShowImageWindow}
+        activeMediaModal={activeMediaModal}
+        onCloseMediaModal={() => setActiveMediaModal(null)}
       />
     </div>
   );

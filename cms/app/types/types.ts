@@ -65,7 +65,7 @@ export interface ArticleUpdate {
   media?: Media;
   category_ids: string[];
   categories?: Category[];
-  translations: Record<string, Partial<ArticleTranslation>>;
+  translation: Partial<ArticleTranslation>;
   updated_at: string;
 }
 

@@ -129,13 +129,11 @@ function SelectMedia({
   const [uploadedFiles, setUploadedFiles] = useState<MediaItemRes[]>([]);
   const [loading, setLoading] = useState(true);
 
-  console.log(uploadedFiles);
 
   useEffect(() => {
     const fetchUploadedFiles = async () => {
       try {
         const mediaFiles = await getMedia();
-        console.log(uploadedFiles);
         setUploadedFiles(mediaFiles.files.map((file) => file));
       } catch (error) {
         console.error("Failed to fetch uploaded files:", error);

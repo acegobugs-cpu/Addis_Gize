@@ -218,7 +218,7 @@ func (r *Router) setupRoutes(l *limiter.Limiter) {
 				router.Use(r.authMiddleware.Middleware)
 				router.Post("/", r.articleHandler.CreateArticle)
 				router.Route("/{id}", func(router chi.Router) {
-					router.Put("/", r.articleHandler.UpdateArticle)
+					router.Patch("/", r.articleHandler.UpdateArticle)
 					router.Delete("/", r.articleHandler.DeleteArticle)
 				})
 			})

@@ -77,7 +77,7 @@ export default function ArticleForm() {
     };
 
     try {
-      await createArticle(payload);
+      await createArticle(JSON.parse(JSON.stringify(payload)));
       setSuccess(true);
       setError(null);
 

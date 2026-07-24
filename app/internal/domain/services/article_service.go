@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 
 	"app/internal/domain/entities"
 	"app/internal/domain/repositories"
@@ -49,6 +50,25 @@ func (s *ArticleService) CreateArticle(ctx context.Context, article *entities.Ar
 	return nil
 }
 
+// UpdateArticle updates an article
+func (s *ArticleService) UpdateArticle(ctx context.Context, id uuid.UUID, patch entities.ArticlePatch) (*entities.Article, error) {
+	// 1. Fetch existing article from storage
+	article, err := s.articleRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, errors.ErrNotFound.W("failed to fetch article", "")
+	}
+
+	// 2. Apply patch in-place on the domain entity
+	article.ApplyPatch(patch)
+
+	// 3. Persist updated entity via repository
+	if err := s.articleRepo.Update(ctx, article); err != nil {
+		return nil, fmt.Errorf("failed to update article in database: %w", err)
+	}
+
+	return article, nil
+}
+
 // GetArticleByID retrieves an article by ID
 func (s *ArticleService) GetArticleByID(ctx context.Context, id uuid.UUID) (*entities.Article, error) {
 	article, err := s.articleRepo.FindByID(ctx, id)
@@ -59,33 +79,12 @@ func (s *ArticleService) GetArticleByID(ctx context.Context, id uuid.UUID) (*ent
 }
 
 // GetArticleBySlug retrieves an article by slug and locale
-func (s *ArticleService) GetArticleBySlug(ctx context.Context, slug, locale string) (*entities.Article, error) {
-	article, err := s.articleRepo.FindBySlug(ctx, slug, locale)
+func (s *ArticleService) GetArticleBySlug(ctx context.Context, slug string) (*entities.Story, error) {
+	article, err := s.articleRepo.FindBySlug(ctx, slug)
 	if err != nil {
 		return nil, errors.ErrResourceNotFound
 	}
 	return article, nil
-}
-
-// UpdateArticle updates an article
-func (s *ArticleService) UpdateArticle(ctx context.Context, article *entities.Article, categoryIDs *[]uuid.UUID) error {
-	if err := s.articleRepo.Update(ctx, article); err != nil {
-		return errors.ErrInternalServer.W("Failed to update article", "")
-	}
-
-	// Update categories if provided
-	if categoryIDs != nil {
-		// This would require removing old categories and adding new ones
-		// For simplicity, we'll just add new categories
-		ids := *categoryIDs
-		for _, catID := range ids {
-			if err := s.articleRepo.AddCategory(ctx, article.ID, catID); err != nil {
-				return errors.ErrInternalServer.W("Failed to add category to article", "")
-			}
-		}
-	}
-
-	return nil
 }
 
 // DeleteArticle deletes an article

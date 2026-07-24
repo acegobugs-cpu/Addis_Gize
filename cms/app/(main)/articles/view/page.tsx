@@ -42,7 +42,6 @@ export default function Articles() {
       const res = await getArticles();
       if (res.data?.length){
          setArticles(res.data);
-         console.log("articles", res.data);
       }
       setLoading(false);
     } catch (error) {
@@ -437,7 +436,6 @@ function EditArticleModal({
     const fetchCategories = async () => {
       try {
         const categoriesData = await getCategories();
-        console.log(categoriesData);
         if (categoriesData)setCategories(categoriesData?.data);
       } catch (err) {
         setError("Failed to load categories");
@@ -519,39 +517,48 @@ function EditArticleModal({
   );
 
   const handleSubmit = async () => {
-    try {
-      const translationsDict: Record<string, any> = {};
+  try {
+    // 1. Get the current active translation or fall back to the first available locale
+    const currentLocale = Object.keys(formData.translations)[0];
+    const translationData = formData.translations[currentLocale];
 
-      Object.entries(formData.translations).forEach(([locale, translation]) => {
-        translationsDict[locale] = {
-          id: translation.id,
-          locale: translation.locale || locale,
-          title: translation.title || "",
-          slug: translation.slug || "",
-          description: translation.description || "",
-          content: translation.content || [],
-          updated_at: new Date().toISOString(),
-        };
-      });
-      const payload: Partial<ArticleUpdate> = {
-        tag: formData.tag,
-        category_ids: formData.category_ids,
-        media: formData.media,
-        updated_at: new Date().toISOString(),
-        translations: translationsDict,
-      };
-      await updateArticle(article.id, payload);
-      setSuccess(true);
-      await refreshArticles();
-      onClose();
-    } catch (err) {
-      console.error("Update failed", err);
-      setError("Failed to update article");
-    }
-  };
+    // 2. Format single TranslationPatch
+    const translationPatch = translationData
+      ? {
+          id: translationData.id || undefined,
+          editor_id: translationData.editor_id || undefined,
+          locale: translationData.locale || currentLocale,
+          title: translationData.title || undefined,
+          slug: translationData.slug || undefined,
+          description: translationData.description || undefined,
+          content: translationData.content || {},
+        }
+      : undefined;
+
+    // 3. Construct ArticlePatch payload
+    const payload = {
+      tag: formData.tag || undefined,
+      media: formData.media || {},
+      categories_ids: formData.category_ids, // Pass whatever category structure you have
+      translation: translationPatch,
+    };
+
+    console.log(
+    "payload attrs:",
+    JSON.stringify(payload.translation?.content?.content?.[0])
+  );
+    await updateArticle(article.id, JSON.parse(JSON.stringify(payload)));
+    setSuccess(true);
+    await refreshArticles();
+    onClose();
+  } catch (err) {
+    console.error("Update failed", err);
+    setError("Failed to update article");
+  }
+};
 
   const t = formData.translations[selectedLocale] || {};
-
+  console.log(t.id);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">

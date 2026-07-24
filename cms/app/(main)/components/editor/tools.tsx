@@ -14,7 +14,11 @@ import {
   TextAlignJustify,
   ChevronDown,
   Baseline,
+  ImageIcon,
+  Video,
+  Code,
 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 const presetHighlights = [
   { color: "#fff59d", label: "Yellow" },
@@ -333,9 +337,39 @@ export function TextFormattingControls({ editor, currentColor, showColorPicker, 
   );
 }
 
-export function InsertControls({ editor, setShowImageWindow }: any) {
+type MediaType = "image" | "video" | "embed";
+
+interface InsertControlsProps {
+  editor: any;
+  setShowImageWindow: (type: MediaType) => void;
+}
+
+export function InsertControls({ editor, setShowImageWindow }: InsertControlsProps) {
+  const [showMediaDropdown, setShowMediaDropdown] = useState(false);
+  const mediaDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        mediaDropdownRef.current &&
+        !mediaDropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowMediaDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleSelectMedia = (type: MediaType) => {
+    setShowMediaDropdown(false);
+    setShowImageWindow(type);
+  };
+
   return (
-    <>
+    <div className="flex items-center gap-0.5">
+      {/* Blockquote */}
       <ToolbarButton
         title="Quote"
         active={editor.isActive("blockquote")}
@@ -343,6 +377,8 @@ export function InsertControls({ editor, setShowImageWindow }: any) {
       >
         <Quote size={18} />
       </ToolbarButton>
+
+      {/* Link */}
       <ToolbarButton
         title="Insert link"
         active={editor.isActive("link")}
@@ -353,10 +389,61 @@ export function InsertControls({ editor, setShowImageWindow }: any) {
       >
         <LinkIcon size={18} />
       </ToolbarButton>
-      <ToolbarButton title="Insert image" onMouseDown={() => setShowImageWindow(true)}>
-        <ImagePlus size={18} />
-      </ToolbarButton>
-    </>
+
+      {/* Media Dropdown Trigger */}
+      <div className="relative" ref={mediaDropdownRef}>
+        <button
+          type="button"
+          title="Insert media"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            setShowMediaDropdown((prev) => !prev);
+          }}
+          className={`flex items-center gap-0.5 px-1.5 py-1 rounded text-gray-700 hover:bg-gray-100 transition-colors ${
+            showMediaDropdown ? "bg-gray-100" : ""
+          }`}
+        >
+          <ImageIcon size={18} />
+          <ChevronDown size={12} className="text-gray-500" />
+        </button>
+
+        {/* Media Type Dropdown Menu */}
+        {showMediaDropdown && (
+          <div className="absolute left-0 mt-1 w-40 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-50">
+            <button
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleSelectMedia("image");
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 hover:bg-gray-100 text-left transition-colors"
+            >
+              <ImageIcon size={15} />
+              <span>Image</span>
+            </button>
+            <button
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleSelectMedia("video");
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 hover:bg-gray-100 text-left transition-colors"
+            >
+              <Video size={15} />
+              <span>Video</span>
+            </button>
+            <button
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleSelectMedia("embed");
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 hover:bg-gray-100 text-left transition-colors"
+            >
+              <Code size={15} />
+              <span>Embed</span>
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 

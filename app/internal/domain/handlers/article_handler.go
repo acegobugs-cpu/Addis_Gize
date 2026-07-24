@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"app/internal/domain/appContext"
@@ -78,6 +80,39 @@ func (h *ArticleHandler) CreateArticle(w http.ResponseWriter, r *http.Request) {
 	h.handler.RespondJSON(w, http.StatusCreated, article)
 }
 
+// UpdateArticle handles updating an article
+func (h *ArticleHandler) UpdateArticle(w http.ResponseWriter, r *http.Request) {
+	// 1. Extract Article ID from URL param
+	idParam := chi.URLParam(r, "id")
+	articleID, err := uuid.Parse(idParam)
+	if err != nil {
+		h.handler.RespondError(w, errors.ErrInvalidInput.W("Invalid article ID", ""))
+		return
+	}
+
+	// 2. Decode the patch body
+	var patch entities.ArticlePatch
+	if err := json.NewDecoder(r.Body).Decode(&patch); err != nil {
+		h.handler.RespondError(w, errors.ErrInvalidInput.W("Invalid payload", ""))
+		return
+	}
+
+	// 3. Delegate business logic / DB update to service
+	jsonBytes, err := json.MarshalIndent(patch.Translations.Content, "", "  ")
+	if err != nil {
+		logger.Error("failed to marshal content")
+	} else {
+		logger.Info(fmt.Sprintf("Incoming Content Payload:\n%s", string(jsonBytes)))
+	}
+	updatedArticle, err := h.articleService.UpdateArticle(r.Context(), articleID, patch)
+	if err != nil {
+		h.handler.RespondError(w, err)
+		return
+	}
+
+	h.handler.RespondJSON(w, http.StatusOK, updatedArticle)
+}
+
 // GetArticle handles getting an article by ID
 func (h *ArticleHandler) GetArticle(w http.ResponseWriter, r *http.Request) {
 	// Extract article ID from URL params
@@ -87,12 +122,22 @@ func (h *ArticleHandler) GetArticle(w http.ResponseWriter, r *http.Request) {
 
 // GetArticleBySlug handles getting an article by slug
 func (h *ArticleHandler) GetArticleBySlug(w http.ResponseWriter, r *http.Request) {
-	h.handler.RespondJSON(w, http.StatusOK, map[string]string{"message": "Get article by slug endpoint"})
-}
+	// 1. Extract the slug from the URL parameters
+	slug := chi.URLParam(r, "slug")
+	if slug == "" {
+		h.handler.RespondError(w, errors.ErrBadRequest)
+		return
+	}
 
-// UpdateArticle handles updating an article
-func (h *ArticleHandler) UpdateArticle(w http.ResponseWriter, r *http.Request) {
-	h.handler.RespondJSON(w, http.StatusOK, map[string]string{"message": "Update article endpoint"})
+	// 2. Delegate fetching logic to the service layer
+	article, err := h.articleService.GetArticleBySlug(r.Context(), slug)
+	if err != nil {
+		h.handler.RespondError(w, err)
+		return
+	}
+
+	// 3. Return the article JSON
+	h.handler.RespondJSON(w, http.StatusOK, article)
 }
 
 // DeleteArticle handles deleting an article
@@ -114,8 +159,6 @@ func (h *ArticleHandler) ListArticles(w http.ResponseWriter, r *http.Request) {
 
 func (h *ArticleHandler) LanArticles(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-
-	logger.Info("lan endpoint")
 	// 1. Extract the locale parameter from the URL path
 	lan := chi.URLParam(r, "lan")
 	if lan == "" {

@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	errs "errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -78,6 +79,113 @@ func (r *ArticleRepository) Create(ctx context.Context, article *entities.Articl
 	return nil
 }
 
+// Update saves modifications to the article and updates nested associations
+func (r *ArticleRepository) Update(ctx context.Context, article *entities.Article) error {
+	tx, err := r.db.BeginTx(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// 1. Update primary article fields
+	articleQuery := `
+		UPDATE articles
+		SET tag = $1, media = $2, updated_at = $3
+		WHERE id = $4
+	`
+	_, err = tx.Exec(ctx, articleQuery,
+		article.Tag,
+		article.Media,
+		article.UpdatedAt,
+		article.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update article core attributes: %w", err)
+	}
+
+	// 2. Sync Categories (Many-to-Many join table) if categories were patched
+	if article.Categories != nil {
+		// Delete existing associations
+		deleteQuery := `DELETE FROM article_categories WHERE article_id = $1`
+		if _, err := tx.Exec(ctx, deleteQuery, article.ID); err != nil {
+			return fmt.Errorf("failed to clear existing article categories: %w", err)
+		}
+
+		// Insert updated associations
+		if len(article.Categories) > 0 {
+			categoryQuery := `
+				INSERT INTO article_categories (article_id, category_id)
+				VALUES ($1, $2)
+			`
+			for _, cat := range article.Categories {
+				if _, err := tx.Exec(ctx, categoryQuery, article.ID, cat.ID); err != nil {
+					return fmt.Errorf("failed to associate category %s: %w", cat.ID, err)
+				}
+			}
+		}
+	}
+
+	// 3. Upsert translations (Article Locales)
+	for _, translation := range article.Translations {
+		if translation.ID == uuid.Nil {
+			// Insert new translation created during patch
+			insertLocaleQuery := `
+				INSERT INTO article_locale (
+					article_id, editor_id, locale, title, slug, description, content, published_at, updated_at
+				)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+				RETURNING id
+			`
+			err = tx.QueryRow(ctx, insertLocaleQuery,
+				article.ID,
+				translation.EditorID,
+				translation.Locale,
+				translation.Title,
+				translation.Slug,
+				translation.Description,
+				translation.Content,
+				translation.PublishedAt,
+				translation.UpdatedAt,
+			).Scan(&translation.ID)
+
+			if err != nil {
+				return fmt.Errorf("failed to insert new translation: %w", err)
+			}
+		} else {
+			// Update existing translation
+			updateLocaleQuery := `
+				UPDATE article_locale
+				SET editor_id = $1,
+				    title = $2,
+				    slug = $3,
+				    description = $4,
+				    content = $5,
+				    updated_at = $6
+				WHERE id = $7 AND article_id = $8
+			`
+			_, err = tx.Exec(ctx, updateLocaleQuery,
+				translation.EditorID,
+				translation.Title,
+				translation.Slug,
+				translation.Description,
+				translation.Content,
+				translation.UpdatedAt,
+				translation.ID,
+				article.ID,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to update translation %s: %w", translation.ID, err)
+			}
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
 func (r *ArticleRepository) FindByID(ctx context.Context, id uuid.UUID) (*entities.Article, error) {
 	query := `
 		SELECT id, tag, media, published_at, updated_at
@@ -108,35 +216,50 @@ func (r *ArticleRepository) FindByID(ctx context.Context, id uuid.UUID) (*entiti
 	return article, nil
 }
 
-func (r *ArticleRepository) FindBySlug(ctx context.Context, slug, locale string) (*entities.Article, error) {
+func (r *ArticleRepository) FindBySlug(ctx context.Context, slug string) (*entities.Story, error) {
 	query := `
-		SELECT a.id, a.tag, a.media, a.published_at, a.updated_at
+		SELECT 
+			a.id, 
+			a.tag, 
+			a.media, 
+			al.article_id,
+			al.editor_id,
+			al.locale,
+			al.title, 
+			al.slug, 
+			al.description, 
+			al.content,
+			al.published_at, 
+			al.updated_at
 		FROM articles a
 		INNER JOIN article_locale al ON a.id = al.article_id
-		WHERE al.slug = $1 AND al.locale = $2
+		WHERE al.slug = $1
 	`
-	article := &entities.Article{}
-	err := r.db.QueryRow(ctx, query, slug, locale).Scan(
-		&article.ID,
-		&article.Tag,
-		&article.Media,
-		&article.PublishedAt,
-		&article.UpdatedAt,
+
+	story := &entities.Story{}
+	err := r.db.QueryRow(ctx, query, slug).Scan(
+		&story.ID,
+		&story.Tag,
+		&story.Media,
+		&story.ArticleID,
+		&story.EditorID,
+		&story.Locale,
+		&story.Title,
+		&story.Slug,
+		&story.Description,
+		&story.Content,
+		&story.PublishedAt,
+		&story.UpdatedAt,
 	)
 
-	if err == pgx.ErrNoRows {
+	if errs.Is(err, pgx.ErrNoRows) {
 		return nil, errors.ErrResourceNotFound
 	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to find article by slug: %w", err)
+		return nil, fmt.Errorf("failed to find story by slug: %w", err)
 	}
 
-	article.Translations, err = r.FindLocalesByArticleID(ctx, article.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	return article, nil
+	return story, nil
 }
 
 func (r *ArticleRepository) FindByTag(ctx context.Context, tag string) ([]*entities.Article, error) {
@@ -201,7 +324,7 @@ func (r *ArticleRepository) FindByCategory(ctx context.Context, categoryID uuid.
 	return articles, nil
 }
 
-func (r *ArticleRepository) Update(ctx context.Context, article *entities.Article) error {
+func (r *ArticleRepository) UpdateArticle(ctx context.Context, article *entities.Article) error {
 	query := `
 		UPDATE articles 
 		SET tag = $2, media = $3, updated_at = $4
@@ -248,10 +371,9 @@ func (r *ArticleRepository) List(ctx context.Context, limit, offset int) ([]*ent
 		FROM articles a
 		INNER JOIN article_locale al ON a.id = al.article_id
 		ORDER BY al.published_at DESC 
-		LIMIT $1 OFFSET $2
 	`
 
-	rows, err := r.db.Query(ctx, query, limit, offset)
+	rows, err := r.db.Query(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list articles: %w", err)
 	}

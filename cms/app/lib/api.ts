@@ -135,6 +135,10 @@ export async function createArticle(data: Partial<Article>) {
 }
 
 export async function updateArticle(article_id: string, data: Partial<ArticleUpdate>) {
+  console.log(
+    "payload attrs:",
+    JSON.stringify(data.translation?.content?.content?.[0])
+  );
   const res = await backend.patch(`/articles/${article_id}`, data);
   return handleResponse<ArticleUpdate>(res);
 }
