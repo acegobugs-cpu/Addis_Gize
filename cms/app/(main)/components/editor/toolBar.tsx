@@ -34,7 +34,7 @@ export default function Toolbar({
 }: any) {
   return (
     <div
-      className={`bg-white border-b transition-shadow ${
+      className={`sticky top-14 z-10 bg-white border-b transition-shadow ${
         isScrolled ? "border-gray-200 shadow-[0_1px_2px_rgba(60,64,67,0.15)]" : "border-gray-100"
       }`}
     >
