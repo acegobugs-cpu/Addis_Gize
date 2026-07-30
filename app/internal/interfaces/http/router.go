@@ -209,15 +209,21 @@ func (r *Router) setupRoutes(l *limiter.Limiter) {
 				router.Get("/", r.articleHandler.ListArticles)
 				router.Get("/search", r.articleHandler.SearchArticles)
 				router.Get("/lan/{lan}", r.articleHandler.LanArticles)
-				router.Get("/{id}", r.articleHandler.GetArticle)
 				router.Get("/slug/{slug}", r.articleHandler.GetArticleBySlug)
+				router.Get("/{id}", r.articleHandler.GetArticleByID)
 			})
 
 			router.Group(func(router chi.Router) {
 				router.Use(r.csrfProtection.Middleware)
 				router.Use(r.authMiddleware.Middleware)
 				router.Post("/", r.articleHandler.CreateArticle)
-				router.Route("/{id}", func(router chi.Router) {
+			})
+
+			router.Route("/{id}", func(router chi.Router) {
+				router.Get("/", r.articleHandler.GetArticleByID)
+				router.Group(func(router chi.Router) {
+					router.Use(r.csrfProtection.Middleware)
+					router.Use(r.authMiddleware.Middleware)
 					router.Patch("/", r.articleHandler.UpdateArticle)
 					router.Delete("/", r.articleHandler.DeleteArticle)
 				})

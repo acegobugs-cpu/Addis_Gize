@@ -216,6 +216,85 @@ func (r *ArticleRepository) FindByID(ctx context.Context, id uuid.UUID) (*entiti
 	return article, nil
 }
 
+func (r *ArticleRepository) FindArticleByID(ctx context.Context, id uuid.UUID) (*entities.Article, error) {
+	query := `
+		SELECT 
+			a.id, 
+			a.tag, 
+			a.media, 
+			al.id,
+			al.article_id,
+			al.locale,
+			al.title,
+			al.slug,
+			al.description,
+			al.content,
+			al.published_at, 
+			al.updated_at
+		FROM articles a
+		INNER JOIN article_locale al ON a.id = al.article_id
+		WHERE a.id = $1
+	`
+
+	rows, err := r.db.Query(ctx, query, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find article by ID: %w", err)
+	}
+	defer rows.Close()
+
+	var article *entities.Article
+
+	for rows.Next() {
+		var (
+			articleID  uuid.UUID
+			tag        string
+			media      map[string]any
+			localeItem entities.ArticleLocale
+		)
+
+		err := rows.Scan(
+			&articleID,
+			&tag,
+			&media,
+			&localeItem.ID,
+			&localeItem.ArticleID,
+			&localeItem.Locale,
+			&localeItem.Title,
+			&localeItem.Slug,
+			&localeItem.Description,
+			&localeItem.Content,
+			&localeItem.PublishedAt,
+			&localeItem.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan article row: %w", err)
+		}
+
+		if article == nil {
+			article = &entities.Article{
+				ID:           articleID,
+				Tag:          tag,
+				Media:        media,
+				PublishedAt:  localeItem.PublishedAt,
+				UpdatedAt:    localeItem.UpdatedAt,
+				Translations: []*entities.ArticleLocale{},
+			}
+		}
+
+		article.Translations = append(article.Translations, &localeItem)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration error: %w", err)
+	}
+
+	if article == nil {
+		return nil, errors.ErrResourceNotFound
+	}
+
+	return article, nil
+}
+
 func (r *ArticleRepository) FindBySlug(ctx context.Context, slug string) (*entities.Story, error) {
 	query := `
 		SELECT 
@@ -352,8 +431,8 @@ func (r *ArticleRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-func (r *ArticleRepository) List(ctx context.Context, limit, offset int) ([]*entities.Article, error) {
-	// 1. Query selecting columns for both Article and ArticleLocale
+func (r *ArticleRepository) List(ctx context.Context, lang string, limit, offset int) ([]*entities.Article, error) {
+	// If lang is provided, filter by locale; otherwise, return all locales.
 	query := `
 		SELECT 
 			a.id, 
@@ -365,21 +444,21 @@ func (r *ArticleRepository) List(ctx context.Context, limit, offset int) ([]*ent
 			al.title,
 			al.slug,
 			al.description,
-			al.content,
 			al.published_at, 
 			al.updated_at
 		FROM articles a
 		INNER JOIN article_locale al ON a.id = al.article_id
+		WHERE ($1 = '' OR al.locale = $1)
 		ORDER BY al.published_at DESC 
+		LIMIT $2 OFFSET $3
 	`
 
-	rows, err := r.db.Query(ctx, query)
+	rows, err := r.db.Query(ctx, query, lang, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list articles: %w", err)
 	}
 	defer rows.Close()
 
-	// Map to track unique articles by UUID to prevent duplicates from JOIN
 	articleMap := make(map[uuid.UUID]*entities.Article)
 	var orderedIDs []uuid.UUID
 
@@ -391,7 +470,6 @@ func (r *ArticleRepository) List(ctx context.Context, limit, offset int) ([]*ent
 			localeItem entities.ArticleLocale
 		)
 
-		// 2. Scan ALL 12 selected columns in exact order
 		err := rows.Scan(
 			&articleID,
 			&tag,
@@ -402,7 +480,6 @@ func (r *ArticleRepository) List(ctx context.Context, limit, offset int) ([]*ent
 			&localeItem.Title,
 			&localeItem.Slug,
 			&localeItem.Description,
-			&localeItem.Content,
 			&localeItem.PublishedAt,
 			&localeItem.UpdatedAt,
 		)
@@ -410,7 +487,6 @@ func (r *ArticleRepository) List(ctx context.Context, limit, offset int) ([]*ent
 			return nil, fmt.Errorf("failed to scan article row: %w", err)
 		}
 
-		// 3. Group locales into the parent Article
 		article, exists := articleMap[articleID]
 		if !exists {
 			article = &entities.Article{
@@ -425,7 +501,6 @@ func (r *ArticleRepository) List(ctx context.Context, limit, offset int) ([]*ent
 			orderedIDs = append(orderedIDs, articleID)
 		}
 
-		// Append locale to the article's Translations slice
 		article.Translations = append(article.Translations, &localeItem)
 	}
 
@@ -433,7 +508,6 @@ func (r *ArticleRepository) List(ctx context.Context, limit, offset int) ([]*ent
 		return nil, fmt.Errorf("rows iteration error: %w", err)
 	}
 
-	// 4. Preserve SQL ORDER BY sequence when building final slice
 	articles := make([]*entities.Article, 0, len(orderedIDs))
 	for _, id := range orderedIDs {
 		articles = append(articles, articleMap[id])
@@ -444,23 +518,40 @@ func (r *ArticleRepository) List(ctx context.Context, limit, offset int) ([]*ent
 
 func (r *ArticleRepository) ListStories(ctx context.Context, lan string, limit, offset int) ([]*entities.Story, error) {
 	query := `
-        SELECT 
-            a.id, 
-            a.tag, 
-            a.media, 
-            al.published_at, 
-            al.updated_at,
-            al.title,
-            al.slug,
-            al.description,
-            al.content
-        FROM articles a
-        INNER JOIN article_locale al ON a.id = al.article_id
-        WHERE al.locale = $1
-        ORDER BY a.published_at DESC 
-        LIMIT $2 OFFSET $3
+        WITH ranked_articles AS (
+			SELECT 
+				a.id, 
+				a.tag, 
+				a.media, 
+				al.published_at, 
+				al.updated_at,
+				al.title,
+				al.slug,
+				al.description,
+				al.content,
+				-- Number each article in chronological order (newest first)
+				ROW_NUMBER() OVER (ORDER BY al.published_at DESC) AS row_num
+			FROM articles a
+			INNER JOIN article_locale al ON a.id = al.article_id
+			WHERE al.locale = $1
+		)
+		SELECT 
+			id, 
+			tag, 
+			media, 
+			published_at, 
+			updated_at, 
+			title, 
+			slug, 
+			description, 
+			content
+		FROM ranked_articles
+		-- Include everything from last 24h, or top 24 newest overall
+		WHERE published_at >= NOW() - INTERVAL '24 hours' 
+		OR row_num <= 24
+		ORDER BY published_at DESC;
     `
-	rows, err := r.db.Query(ctx, query, lan, limit, offset)
+	rows, err := r.db.Query(ctx, query, lan)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list articles: %w", err)
 	}

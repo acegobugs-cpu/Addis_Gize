@@ -149,7 +149,8 @@ export const VideoNode = Node.create({
       },
       autoplay: {
         default: false,
-        parseHTML: (element) => element.querySelector("video")?.hasAttribute("autoplay") ?? false,
+        // Always force autoplay to false when parsing incoming HTML
+        parseHTML: () => false,
       },
       loop: {
         default: false,
@@ -167,6 +168,7 @@ export const VideoNode = Node.create({
   },
 
   renderHTML({ HTMLAttributes }) {
+    // Exclude 'autoplay' explicitly from being output to HTML
     const { src, poster, caption, controls, autoplay, loop, ...rest } = HTMLAttributes;
 
     const videoAttrs: Record<string, any> = {
@@ -176,8 +178,8 @@ export const VideoNode = Node.create({
 
     if (poster) videoAttrs.poster = poster;
     if (controls) videoAttrs.controls = "";
-    if (autoplay) videoAttrs.autoplay = "";
     if (loop) videoAttrs.loop = "";
+    // Note: videoAttrs.autoplay is intentionally omitted here
 
     const children: any[] = [["video", videoAttrs]];
 
@@ -200,7 +202,6 @@ export const VideoNode = Node.create({
           poster?: string;
           caption?: string;
           controls?: boolean;
-          autoplay?: boolean;
           loop?: boolean;
         }) =>
         ({ commands }) =>
@@ -211,7 +212,7 @@ export const VideoNode = Node.create({
               poster: attrs.poster || "",
               caption: attrs.caption || "",
               controls: attrs.controls ?? true,
-              autoplay: attrs.autoplay ?? false,
+              autoplay: false, // Force autoplay disabled on insert
               loop: attrs.loop ?? false,
             },
           }),

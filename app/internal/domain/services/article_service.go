@@ -71,7 +71,7 @@ func (s *ArticleService) UpdateArticle(ctx context.Context, id uuid.UUID, patch 
 
 // GetArticleByID retrieves an article by ID
 func (s *ArticleService) GetArticleByID(ctx context.Context, id uuid.UUID) (*entities.Article, error) {
-	article, err := s.articleRepo.FindByID(ctx, id)
+	article, err := s.articleRepo.FindArticleByID(ctx, id)
 	if err != nil {
 		return nil, errors.ErrResourceNotFound
 	}
@@ -96,8 +96,8 @@ func (s *ArticleService) DeleteArticle(ctx context.Context, id uuid.UUID) error 
 }
 
 // ListArticles lists all articles with pagination
-func (s *ArticleService) ListArticles(ctx context.Context, limit, offset int) ([]*entities.Article, error) {
-	articles, err := s.articleRepo.List(ctx, limit, offset)
+func (s *ArticleService) ListArticles(ctx context.Context, lan string, limit, offset int) ([]*entities.Article, error) {
+	articles, err := s.articleRepo.List(ctx, lan, limit, offset)
 	if err != nil {
 		return nil, errors.ErrInternalServer.W("Failed to list articles", "")
 	}

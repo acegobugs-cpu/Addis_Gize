@@ -114,14 +114,14 @@ export async function updateUser(id: number, data: Partial<User>) {
 // ARTICLES ACTIONS
 // ==========================================
 
-export async function getArticles() {
-  const res = await backend.get("/articles");
+export async function getArticles(lan:string) {
+  const res = await backend.get(`/articles?lan=${lan}`);
   return handleResponse<AppResponse<Article[]>>(res);
 }
 
 export async function getArticleById(id: string) {
   const res = await backend.get(`/articles/${id}`);
-  return handleResponse<Article>(res);
+  return handleResponse<{data:Article}>(res);
 }
 
 export async function getArticleBySlug(slug: string) {

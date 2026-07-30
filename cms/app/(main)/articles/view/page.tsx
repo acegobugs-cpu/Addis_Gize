@@ -3,7 +3,6 @@
 import dynamic from "next/dynamic";
 import { useState, useEffect, useRef, useCallback } from "react";
 import Select from "react-select";
-import { EllipsisVerticalIcon } from "@heroicons/react/24/solid";
 import { useAuth } from "@/app/components/AuthContext";
 import MediaBlock from "../../components/mediaBlock";
 import MediaRenderer from "../../components/mediaRenderer";
@@ -19,46 +18,58 @@ import { addLocale, deleteArticle, deleteLocale, getArticles, getCategories, upd
 
 import TextEditor, { TextEditorRef } from "../../components/editor/textEditor";
 
+import {
+  EllipsisVerticalIcon,
+  PlusIcon,
+  PencilSquareIcon,
+  TrashIcon,
+  GlobeAltIcon,
+} from "@heroicons/react/24/outline";
+import { useRouter } from "next/navigation";
+
 export default function Articles() {
-  const [articleAdd, setArticleAdd] = useState(false);
+  const router = useRouter();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dialogPos, setDialogPos] = useState({ x: 0, y: 0 });
-  const [showLocaleModal, setShowLocaleModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [currentArticle, setCurrentArticle] = useState<Article | null>(null);
   const [lan, setLan] = useState("am");
-  const articleRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const { user } = useAuth();
 
   useEffect(() => {
     fetchArticles();
-  }, []);
+  }, [lan]);
+
+  // Handle click outside context menu to close automatically
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        closeDialog();
+      }
+    };
+    if (selectedArticle) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [selectedArticle]);
 
   const fetchArticles = async () => {
+    setLoading(true);
     try {
-      const res = await getArticles();
-      if (res.data?.length){
-         setArticles(res.data);
+      const res = await getArticles(lan);
+      if (res.data) {
+        setArticles(res.data);
       }
-      setLoading(false);
-    } catch (error) {
-      console.error("Error fetching articles:", error);
-      setLoading(false);
+    } catch (err) {
+      console.error("Error fetching articles:", err);
       setError("Failed to fetch articles");
-    }
-  };
-
-  const refreshArticles = async () => {
-    try {
-      const res = await getArticles();
-      if (res.data?.length){
-         setArticles(res.data);
-      }
-    } catch (error) {
-      setError("Failed to refresh articles");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -66,19 +77,21 @@ export default function Articles() {
     if (!selectedArticle) return;
     try {
       await deleteArticle(selectedArticle.id);
-      setArticles(
-        articles.filter((article) => article.id !== selectedArticle.id),
-      );
-      setSelectedArticle(null);
-      setError(null);
-    } catch (error) {
+      setArticles((prev) => prev.filter((art) => art.id !== selectedArticle.id));
+      closeDialog();
+    } catch (err) {
       setError("Failed to delete article");
     }
   };
 
   const openDialog = (article: Article, event: React.MouseEvent) => {
-    const rect = (event.target as HTMLElement).getBoundingClientRect();
-    setDialogPos({ x: rect.right, y: rect.bottom });
+    event.stopPropagation();
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    // Calculate positioning to keep popover inside screen bounds
+    setDialogPos({
+      x: Math.min(rect.right - 180, window.innerWidth - 200),
+      y: rect.bottom + 8,
+    });
     setSelectedArticle(article);
   };
 
@@ -87,698 +100,180 @@ export default function Articles() {
     setError(null);
   };
 
-  const openLocaleModal = (article: Article) => {
-    setCurrentArticle(article);
-    setShowLocaleModal(true);
-  };
-
-  const closeLocaleModal = () => {
-    setShowLocaleModal(false);
-    setCurrentArticle(null);
-  };
-
   return (
-    <>
-      {currentArticle && showEditModal && (
-        <EditArticleModal
-          article={currentArticle}
-          user={user}
-          isOpen={true}
-          onClose={() => setShowEditModal(false)}
-          refreshArticles={refreshArticles}
-        />
-      )}
+    <div className="w-full max-w-7xl mx-auto px-4 py-8">
+      {/* Header Bar */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 border-b border-gray-100 pb-6">
+        <div>
+          <h1 className="text-3xl font-serif font-bold text-gray-900">Articles</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Manage article translations, categories, and published content.
+          </p>
+        </div>
 
-      {currentArticle && showLocaleModal && (
-        <LocaleForm
-          article={currentArticle}
-          user={user}
-          isOpen={true}
-          onClose={closeLocaleModal}
-          refreshArticles={refreshArticles}
-        />
-      )}
-
-      <div className="w-full py-8">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-serif font-bold">Articles</h1>
-          <div className="flex space-x-6">
+        <div className="flex items-center space-x-4 w-full sm:w-auto justify-between sm:justify-end">
+          {/* Language Selector */}
+          <div className="flex items-center bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5">
+            <GlobeAltIcon className="w-4 h-4 text-gray-500 mr-2" />
             <select
               value={lan}
               onChange={(e) => setLan(e.target.value)}
-              className="rounded-md text-sm hidden sm:block"
+              className="bg-transparent text-sm font-medium text-gray-800 focus:outline-none cursor-pointer"
             >
-              <option value="om">om</option>
-              <option value="am">am</option>
-              <option value="en">en</option>
-              <option value="sw">sw</option>
+              <option value="om">Oromo (om)</option>
+              <option value="am">Amharic (am)</option>
+              <option value="en">English (en)</option>
+              <option value="sw">Swahili (sw)</option>
             </select>
-            <Link
-              href="/articles/write"
-              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
-            >
-              Write Article +
-          </Link>
           </div>
-        </div>
 
-        {loading ? (
-          <p className="text-white">Loading...</p>
-        ) : articles.length > 0 ? (
-          <div className="grid md:grid-cols-3 grid-cols-1 gap-6 text-black">
-            {articles.map((article) => (
+          {/* Write Button */}
+          <Link
+            href="/articles/write"
+            className="inline-flex items-center bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition duration-150 shadow-sm"
+          >
+            <PlusIcon className="h-4 w-4 mr-1.5 stroke-[2.5]" />
+            Write Article
+          </Link>
+        </div>
+      </div>
+
+      {/* Main Grid / Skeleton State */}
+      {loading ? (
+        <div className="grid md:grid-cols-3 grid-cols-1 gap-6">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="bg-gray-100 animate-pulse h-80 rounded-2xl border border-gray-200"
+            />
+          ))}
+        </div>
+      ) : articles.length > 0 ? (
+        <div className="grid md:grid-cols-3 grid-cols-1 gap-6">
+          {articles.map((article) => {
+            // Find locale match for current selected language
+            const localeData = article.translations?.find((tr) => tr.locale === lan);
+
+            return (
               <div
                 key={article.id}
-                ref={(el) => {
-                  articleRefs.current[article.id] = el;
-                }}
-                className="relative bg-white rounded-lg shadow-lg p-4 hover:shadow-xl transition-shadow"
+                className="group relative bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 flex flex-col"
               >
+                {/* Options Menu Toggle */}
                 <button
                   onClick={(e) => openDialog(article, e)}
-                  className="absolute top-2 right-2 text-gray-600 rounded p-1 hover:bg-gray-100 transition-colors"
+                  className="absolute top-3 right-3 z-10 bg-white/90 backdrop-blur-sm text-gray-700 rounded-full p-2 hover:bg-white hover:text-black shadow-sm transition"
                   aria-label="Open options"
                 >
                   <EllipsisVerticalIcon className="h-5 w-5" />
                 </button>
 
-                <div className="mt-8">
-                  {article.media && (
+                {/* Media Section */}
+                <div className="relative w-full h-48 bg-gray-50 overflow-hidden border-b border-gray-100">
+                  {article.media ? (
                     <MediaRenderer
                       media={
                         typeof article.media === "string"
                           ? JSON.parse(article.media)
                           : article.media
                       }
-                      className="w-full h-48 object-cover rounded-lg"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
-                  )}
-                </div>
-
-                <div className="mt-4 space-y-2">
-                  <p className="text-xs text-gray-600">
-                    {article.categories?.map((cat) => cat.name).join(", ")}
-                  </p>
-                  {article.translations
-                    ?.filter((tr) => tr.locale === lan)
-                    .map((tr) => (
-                      <div key={tr.slug} className="space-y-2">
-                        <h2 className="text-lg font-serif font-bold line-clamp-2">
-                          {tr.title}
-                        </h2>
-                        <p className="text-sm text-gray-800 line-clamp-3">
-                          {tr.description}
-                        </p>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-center text-gray-700 py-8">No articles found.</p>
-        )}
-
-        {selectedArticle && (
-          <div className="fixed inset-0 z-50" onClick={closeDialog}>
-            <div
-              className="absolute bg-white p-4 rounded-lg shadow-xl w-48 border border-gray-200"
-              style={{ top: dialogPos.y + 8, left: dialogPos.x - 160 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h2 className="text-sm font-semibold mb-2 text-gray-800">
-                Options
-              </h2>
-              <div className="flex flex-col space-y-2">
-                <button
-                  onClick={() => openLocaleModal(selectedArticle)}
-                  className="bg-green-600 text-white text-sm p-2 rounded hover:bg-green-700 transition-colors"
-                >
-                  + Add Locale
-                </button>
-                <button
-                  onClick={() => {
-                    setCurrentArticle(selectedArticle);
-                    setShowEditModal(true);
-                  }}
-                  className="bg-yellow-500 text-blue-800 text-sm text-center p-2 rounded hover:bg-yellow-600 transition-colors"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={handleDelete}
-                  className="bg-red-600 text-white text-sm p-2 rounded hover:bg-red-700 transition-colors"
-                >
-                  Delete
-                </button>
-              </div>
-              {error && <p className="text-red-600 mt-2 text-sm">{error}</p>}
-            </div>
-          </div>
-        )}
-      </div>
-    </>
-  );
-}
-
-// LocaleForm Component
-function LocaleForm({
-  article,
-  user,
-  onClose,
-  isOpen,
-  refreshArticles,
-}: {
-  article: Article;
-  user: any;
-  onClose: () => void;
-  isOpen: boolean;
-  refreshArticles: () => void;
-}) {
-  if (!isOpen) return null;
-
-  const [User] = useState(user);
-  const [formData, setFormData] = useState({
-    locale: "am",
-    title: "",
-    slug: "",
-    editor_id: 0,
-    article_id: 0,
-    description: "",
-    content: "",
-  });
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const defaultTranslation = article.translations[0];
-
-  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const title = e.target.value.slice(0, 250);
-    const slug = title
-      .normalize("NFKD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^፡-፯\u1200-\u137F\w\s-]/gu, "")
-      .trim()
-      .replace(/\s+/g, "-")
-      .toLowerCase();
-    setFormData({ ...formData, title, slug });
-  };
-
-  useEffect(() => {
-    if (defaultTranslation) {
-      setFormData((prev) => ({
-        ...prev,
-        content: defaultTranslation.content || [],
-      }));
-    }
-  }, [defaultTranslation]);
-
-  const handleSubmit = async () => {
-    try {
-      await addLocale({
-        editor_id: User?.id || 0,
-        article_id: article.id,
-        locale: formData.locale,
-        title: formData.title,
-        slug: formData.slug,
-        description: formData.description,
-        content: formData.content ? formData.content : [],
-      });
-      setSuccess(true);
-      await refreshArticles();
-      onClose();
-    } catch (err) {
-      console.error(err);
-      setError("Failed to add locale");
-      setSuccess(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black text-black bg-opacity-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-serif font-bold">
-              Add Locale for:{" "}
-              <span className="text-purple-600">
-                {article.translations[0]?.title}
-              </span>
-              {User.id}
-            </h2>
-            <button
-              onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 text-xl"
-            >
-              ✕
-            </button>
-          </div>
-
-          <div className="flex flex-col gap-4">
-            <select
-              value={formData.locale}
-              onChange={(e) =>
-                setFormData({ ...formData, locale: e.target.value })
-              }
-              className="border border-gray-300 bg-white text-gray-800 p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            >
-              <option value="am">Amharic</option>
-              <option value="en">English</option>
-              <option value="sw">Swahili</option>
-              <option value="om">Afan Oromo</option>
-            </select>
-
-            <input
-              type="text"
-              placeholder="Title"
-              value={formData.title}
-              onChange={handleTitleChange}
-              className="border border-gray-300 bg-white text-gray-800 p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-
-            <input
-              type="text"
-              placeholder="Slug"
-              value={formData.slug}
-              readOnly
-              className="border border-gray-300 bg-white text-gray-800 p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-
-            <textarea
-              placeholder="Description"
-              value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
-              className="border border-gray-300 bg-white text-gray-800 p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows={3}
-            />
-
-            <h1 className="text-gray-800 font-semibold">Content</h1>
-            <TextEditor
-              onChange={(json) => setFormData({ ...formData, content: json })}
-            />
-
-            <button
-              onClick={handleSubmit}
-              className="bg-purple-600 text-white p-2 rounded hover:bg-purple-700 transition-colors"
-            >
-              Add Translation
-            </button>
-          </div>
-          {success && (
-            <p className="text-green-600 mt-2">Locale added successfully!</p>
-          )}
-          {error && <p className="text-red-600 mt-2">{error}</p>}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// EditArticleModal Component
-function EditArticleModal({
-  article,
-  user,
-  onClose,
-  isOpen,
-  refreshArticles,
-}: {
-  article: Article;
-  user: any;
-  onClose: () => void;
-  isOpen: boolean;
-  refreshArticles: () => void;
-}) {
-  if (!isOpen) return null;
-
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [selectedLocale, setSelectedLocale] = useState("om");
-  const [newLocale, setNewLocale] = useState("om");
-  const [changingLocale, setChangingLocale] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
-    tag: article.tag || "",
-    category_ids: article.categories?.map((c) => c.id) || [],
-    media: article.media || {
-      mediaType: "image",
-      source: "external",
-      url: "",
-    },
-    // translations is a map from locale -> translation object
-    translations: {} as Record<string, Partial<ArticleTranslation>>,
-  });
-
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const categoriesData = await getCategories();
-        if (categoriesData)setCategories(categoriesData?.data);
-      } catch (err) {
-        setError("Failed to load categories");
-      }
-    };
-    fetchCategories();
-  }, []);
-
-  useEffect(() => {
-    const translations: { [key: string]: any } = {};
-    article.translations.forEach((t) => {
-      if (t.locale && typeof t.locale === "string") {
-        translations[t.locale] = {
-          id: t.id,
-          locale: t.locale || "",
-          title: t.title || "",
-          slug: t.slug || "",
-          description: t.description || "",
-          content: t.content || [],
-          updated_at: new Date().toISOString(),
-        };
-      }
-      setSelectedLocale(article.translations[0]?.locale || "om");
-    });
-    setFormData((prev) => ({ ...prev, translations }));
-  }, [article, user]);
-
-  const updateTranslation = (locale: string, updates: any) => {
-    setFormData((prev) => ({
-      ...prev,
-      translations: {
-        ...prev.translations,
-        [locale]: {
-          ...prev.translations[locale],
-          ...updates,
-        },
-      },
-    }));
-  };
-
-  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const title = e.target.value.slice(0, 250);
-    const slug = title
-      .normalize("NFKD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^፡-፯\u1200-\u137F\w\s-]/gu, "")
-      .trim()
-      .replace(/\s+/g, "-")
-      .toLowerCase();
-    updateTranslation(selectedLocale, { title, slug });
-  };
-
-  const handleDeleteTranslation = async (id: number) => {
-    if (!id) return;
-    try {
-      await deleteLocale(id);
-      setFormData((prev) => {
-        const { [selectedLocale]: _, ...restTranslations } = prev.translations;
-        return { ...prev, translations: restTranslations };
-      });
-      setSelectedLocale(Object.keys(formData.translations)[0] || "om");
-      await refreshArticles();
-      setSuccess(true);
-    } catch (error) {
-      setError("Failed to delete translation");
-    }
-  };
-
-  const categoryOptions = categories.map((category) => ({
-    value: category.id,
-    label: category.name,
-  }));
-
-  const handleContentChange = useCallback(
-    (json: any) => {
-      updateTranslation(selectedLocale, { content: json });
-    },
-    [selectedLocale],
-  );
-
-  const handleSubmit = async () => {
-  try {
-    // 1. Get the current active translation or fall back to the first available locale
-    const currentLocale = Object.keys(formData.translations)[0];
-    const translationData = formData.translations[currentLocale];
-
-    // 2. Format single TranslationPatch
-    const translationPatch = translationData
-      ? {
-          id: translationData.id || undefined,
-          editor_id: translationData.editor_id || undefined,
-          locale: translationData.locale || currentLocale,
-          title: translationData.title || undefined,
-          slug: translationData.slug || undefined,
-          description: translationData.description || undefined,
-          content: translationData.content || {},
-        }
-      : undefined;
-
-    // 3. Construct ArticlePatch payload
-    const payload = {
-      tag: formData.tag || undefined,
-      media: formData.media || {},
-      categories_ids: formData.category_ids, // Pass whatever category structure you have
-      translation: translationPatch,
-    };
-
-    console.log(
-    "payload attrs:",
-    JSON.stringify(payload.translation?.content?.content?.[0])
-  );
-    await updateArticle(article.id, JSON.parse(JSON.stringify(payload)));
-    setSuccess(true);
-    await refreshArticles();
-    onClose();
-  } catch (err) {
-    console.error("Update failed", err);
-    setError("Failed to update article");
-  }
-};
-
-  const t = formData.translations[selectedLocale] || {};
-  console.log(t.id);
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-serif font-bold">
-              Edit Article:{" "}
-              <span className="text-purple-600">
-                {article.translations[0]?.title}
-              </span>
-            </h2>
-            <button
-              onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 text-xl"
-            >
-              ✕
-            </button>
-          </div>
-
-          <div className="flex flex-col gap-6">
-            <div className="flex justify-between items-center">
-              <select
-                value={selectedLocale}
-                onChange={(e) => setSelectedLocale(e.target.value)}
-                className="border border-gray-300 bg-white text-gray-800 p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {Object.keys(formData.translations).map((locale) => (
-                  <option key={locale} value={locale}>
-                    {locale.toUpperCase()}
-                  </option>
-                ))}
-              </select>
-
-              <div>
-                <div>
-                  {changingLocale ? (
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={newLocale}
-                        onChange={(e) => setNewLocale(e.target.value)}
-                        className="border border-gray-300 bg-white text-gray-800 p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="om">OM</option>
-                        <option value="am">AM</option>
-                        <option value="en">EN</option>
-                        <option value="sw">SW</option>
-                      </select>
-                      <button
-                        onClick={() => {
-                          // If the new locale is the same as the currently selected one, just close the changer.
-                          if (newLocale === selectedLocale) {
-                            setChangingLocale(false);
-                            return;
-                          }
-
-                          const currentTranslation =
-                            formData.translations[selectedLocale];
-                          if (!currentTranslation) {
-                            setChangingLocale(false);
-                            return;
-                          }
-
-                          // Move the translation to the new locale key and update its locale field.
-                          setFormData((prev) => {
-                            const { [selectedLocale]: _removed, ...rest } =
-                              prev.translations;
-                            return {
-                              ...prev,
-                              translations: {
-                                ...rest,
-                                [newLocale]: {
-                                  ...currentTranslation,
-                                  locale: newLocale,
-                                },
-                              },
-                            };
-                          });
-
-                          // Switch the UI to the new locale and close the changer.
-                          setSelectedLocale(newLocale);
-                          setChangingLocale(false);
-                        }}
-                        className="bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 transition-colors"
-                      >
-                        Confirm
-                      </button>
-                    </div>
                   ) : (
-                    <button
-                      onClick={() => setChangingLocale(true)}
-                      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors whitespace-nowrap"
-                      title="Change locale of current translation"
-                    >
-                      Change Locale
-                    </button>
+                    <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs font-medium">
+                      No Media Attached
+                    </div>
+                  )}
+
+                  {article.tag && (
+                    <span className="absolute bottom-3 left-3 bg-gray-900/80 backdrop-blur-md text-white text-[10px] font-uppercase tracking-wider px-2.5 py-1 rounded-md">
+                      {article.tag}
+                    </span>
                   )}
                 </div>
 
-                <button
-                  onClick={() => {
-                    const id = formData.translations[selectedLocale]?.id;
-                    if (typeof id === "number") {
-                      handleDeleteTranslation(id);
-                    }
-                  }}
-                  className="bg-red-600 text-white text-sm p-2 rounded hover:bg-red-700 transition-colors"
-                  disabled={!formData.translations[selectedLocale]?.id}
-                >
-                  Delete Translation
-                </button>
+                {/* Article Content Details */}
+                <div className="p-5 flex-1 flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-indigo-600">
+                      {article.categories?.map((cat) => cat.name).join(", ") || "General"}
+                    </p>
+
+                    <h2 className="text-lg font-serif font-bold text-gray-900 line-clamp-2 leading-snug">
+                      {localeData?.title || (
+                        <span className="text-gray-400 italic">
+                          Untranslated ({lan})
+                        </span>
+                      )}
+                    </h2>
+
+                    <p className="text-xs text-gray-600 line-clamp-3 leading-relaxed">
+                      {localeData?.description ||
+                        "No summary available for this language translation."}
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="text-center py-16 bg-gray-50 border border-dashed border-gray-200 rounded-2xl">
+          <p className="text-gray-500 text-sm">No articles found in current language ({lan}).</p>
+        </div>
+      )}
 
-            <div className="flex flex-col md:flex-row gap-4 p-4 bg-gray-50 rounded-lg">
-              <input
-                type="text"
-                placeholder="Slug"
-                value={t.slug || ""}
-                readOnly
-                className="border border-gray-300 bg-white text-gray-800 p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1"
-                required
-              />
+      {/* Floating Context Action Menu */}
+      {selectedArticle && (
+        <div
+          ref={menuRef}
+          className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl w-48 py-1.5 animate-in fade-in zoom-in-95 duration-100"
+          style={{ top: dialogPos.y, left: dialogPos.x }}
+        >
+          <div className="px-3 py-1.5 border-b border-gray-100">
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+              Manage Article
+            </p>
+          </div>
 
-              <select
-                value={formData.tag || "primary"}
-                onChange={(e) =>
-                  setFormData({ ...formData, tag: e.target.value })
-                }
-                className="border border-gray-300 bg-white text-gray-800 p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 flex-1"
-                required
-              >
-                <option value="primary">primary</option>
-                <option value="secondary">secondary</option>
-                <option value="breaking news">breaking news</option>
-                <option value="trending">trending</option>
-                <option value="morestories">morestories</option>
-              </select>
-
-              <div className="flex-1">
-                <Select
-                  isMulti
-                  options={categoryOptions}
-                  value={categoryOptions.filter((opt) =>
-                    formData.category_ids.includes(opt.value),
-                  )}
-                  onChange={(selected) =>
-                    setFormData({
-                      ...formData,
-                      category_ids: selected
-                        ? selected.map((opt) => opt.value)
-                        : [],
-                    })
-                  }
-                  className="text-black"
-                  classNamePrefix="react-select"
-                  placeholder="Select categories..."
-                />
-              </div>
-            </div>
-
-            <MediaBlock
-              data={
-                formData.media || {
-                  mediaType: "image",
-                  source: "external",
-                  url: "",
-                }
-              }
-              onChange={(updated) =>
-                setFormData({ ...formData, media: updated })
-              }
-            />
-
-            <hr className="border-gray-300" />
-
-            <input
-              type="text"
-              placeholder="Title"
-              value={t.title || ""}
-              onChange={handleTitleChange}
-              className="border border-gray-300 bg-white text-gray-800 p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-
-            <textarea
-              placeholder="Description"
-              value={t.description || ""}
-              onChange={(e) =>
-                updateTranslation(selectedLocale, {
-                  description: e.target.value,
-                })
-              }
-              className="border border-gray-300 bg-white text-gray-800 p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows={3}
-            />
-
-            <h1 className="text-gray-800 font-semibold">Content</h1>
-            {typeof t.content === "undefined" ? (
-              <p className="text-gray-500">Loading content editor...</p>
-            ) : (
-              <TextEditor
-                key={`${article.id}-${selectedLocale}`}
-                initialValue={t.content}
-                onChange={handleContentChange}
-              />
-            )}
-
+          <div className="p-1 space-y-0.5">
+            {/* Route directly to page for Adding Locale */}
             <button
-              onClick={handleSubmit}
-              className="bg-green-600 text-white p-2 rounded hover:bg-green-700 transition-colors"
+              onClick={() => {
+                closeDialog();
+                router.push(`/articles/${selectedArticle.id}/locale`);
+              }}
+              className="w-full flex items-center text-left text-xs font-medium text-gray-700 px-2.5 py-2 rounded-lg hover:bg-gray-50 hover:text-indigo-600 transition"
             >
-              Save Changes
+              <PlusIcon className="w-4 h-4 mr-2 text-gray-500" />
+              Add Locale
+            </button>
+
+            {/* Route directly to page for Editing Article */}
+            <button
+              onClick={() => {
+                closeDialog();
+                router.push(`/articles/${selectedArticle.id}/edit`);
+              }}
+              className="w-full flex items-center text-left text-xs font-medium text-gray-700 px-2.5 py-2 rounded-lg hover:bg-gray-50 hover:text-amber-600 transition"
+            >
+              <PencilSquareIcon className="w-4 h-4 mr-2 text-gray-500" />
+              Edit Article
+            </button>
+
+            {/* Trigger Delete Action */}
+            <button
+              onClick={handleDelete}
+              className="w-full flex items-center text-left text-xs font-medium text-rose-600 px-2.5 py-2 rounded-lg hover:bg-rose-50 transition"
+            >
+              <TrashIcon className="w-4 h-4 mr-2 text-rose-500" />
+              Delete
             </button>
           </div>
-          {success && (
-            <p className="text-green-600 mt-2">Article updated successfully!</p>
-          )}
-          {error && <p className="text-red-600 mt-2">{error}</p>}
+
+          {error && <p className="text-xs text-rose-600 px-3 py-1 mt-1">{error}</p>}
         </div>
-      </div>
+      )}
     </div>
   );
 }

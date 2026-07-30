@@ -2,8 +2,8 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
+	"strconv"
 
 	"app/internal/domain/appContext"
 	"app/internal/domain/entities"
@@ -84,7 +84,7 @@ func (h *ArticleHandler) CreateArticle(w http.ResponseWriter, r *http.Request) {
 func (h *ArticleHandler) UpdateArticle(w http.ResponseWriter, r *http.Request) {
 	// 1. Extract Article ID from URL param
 	idParam := chi.URLParam(r, "id")
-	articleID, err := uuid.Parse(idParam)
+	localeID, err := uuid.Parse(idParam)
 	if err != nil {
 		h.handler.RespondError(w, errors.ErrInvalidInput.W("Invalid article ID", ""))
 		return
@@ -98,14 +98,9 @@ func (h *ArticleHandler) UpdateArticle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 3. Delegate business logic / DB update to service
-	jsonBytes, err := json.MarshalIndent(patch.Translations.Content, "", "  ")
+	updatedArticle, err := h.articleService.UpdateArticle(r.Context(), localeID, patch)
 	if err != nil {
-		logger.Error("failed to marshal content")
-	} else {
-		logger.Info(fmt.Sprintf("Incoming Content Payload:\n%s", string(jsonBytes)))
-	}
-	updatedArticle, err := h.articleService.UpdateArticle(r.Context(), articleID, patch)
-	if err != nil {
+		logger.LogError(r.Context(), err, "")
 		h.handler.RespondError(w, err)
 		return
 	}
@@ -114,10 +109,21 @@ func (h *ArticleHandler) UpdateArticle(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetArticle handles getting an article by ID
-func (h *ArticleHandler) GetArticle(w http.ResponseWriter, r *http.Request) {
+func (h *ArticleHandler) GetArticleByID(w http.ResponseWriter, r *http.Request) {
 	// Extract article ID from URL params
-	// For now, this is a placeholder
-	h.handler.RespondJSON(w, http.StatusOK, map[string]string{"message": "Get article endpoint"})
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		h.handler.RespondError(w, errors.ErrBadRequest)
+		return
+	}
+	article, err := h.articleService.GetArticleByID(r.Context(), id)
+	if err != nil {
+		h.handler.RespondError(w, err)
+		return
+	}
+
+	// 3. Return the article JSON
+	h.handler.RespondJSON(w, http.StatusOK, article)
 }
 
 // GetArticleBySlug handles getting an article by slug
@@ -148,7 +154,27 @@ func (h *ArticleHandler) DeleteArticle(w http.ResponseWriter, r *http.Request) {
 // ListArticles handles listing all articles
 func (h *ArticleHandler) ListArticles(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	res, err := h.articleService.ListArticles(ctx, 10, 0) // Example: limit=10, offset=0
+	query := r.URL.Query()
+
+	// Read 'lang' query param (defaults to "" if omitted)
+	lan := query.Get("lan")
+
+	// Read 'limit' (default: 10)
+	limit := 20
+	if l := query.Get("limit"); l != "" {
+		if parsedLimit, err := strconv.Atoi(l); err == nil && parsedLimit > 0 {
+			limit = parsedLimit
+		}
+	}
+
+	// Read 'offset' (default: 0)
+	offset := 0
+	if o := query.Get("offset"); o != "" {
+		if parsedOffset, err := strconv.Atoi(o); err == nil && parsedOffset >= 0 {
+			offset = parsedOffset
+		}
+	}
+	res, err := h.articleService.ListArticles(ctx, lan, limit, offset) // Example: limit=10, offset=0
 	if err != nil {
 		h.handler.RespondError(w, err)
 		return
