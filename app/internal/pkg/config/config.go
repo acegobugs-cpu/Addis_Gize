@@ -12,18 +12,19 @@ import (
 )
 
 type Config struct {
-	Server          ServerConfig    `mapstructure:"server"`
-	Database        DatabaseConfig  `mapstructure:"database"`
-	Redis           RedisConfig     `mapstructure:"redis"`
-	Mail            MailConfig      `mapstructure:"mail"`
-	RabbitMQ        RabbitMQConfig  `mapstructure:"rabbitmq"`
-	JWT             JWTConfig       `mapstructure:"jwt"`
-	GRPC            GRPCConfig      `mapstructure:"grpc"`
-	CORS            CORSConfig      `mapstructure:"cors"`
-	Auth            AuthConfig      `mapstructure:"auth"`
-	Storage         StorageConfig   `mapstructure:"storage"`
-	RateLimit       RateLimitConfig `mapstructure:"ratelimit"`
-	Security        SecurityConfig  `mapstructure:"security"`
+	Server          ServerConfig        `mapstructure:"server"`
+	Database        DatabaseConfig      `mapstructure:"database"`
+	Redis           RedisConfig         `mapstructure:"redis"`
+	RabbitMQ        RabbitMQConfig      `mapstructure:"rabbitmq"`
+	ElasticSearch   ElasticSearchConfig `mapstructure:"elasticsearch"`
+	Mail            MailConfig          `mapstructure:"mail"`
+	JWT             JWTConfig           `mapstructure:"jwt"`
+	GRPC            GRPCConfig          `mapstructure:"grpc"`
+	CORS            CORSConfig          `mapstructure:"cors"`
+	Auth            AuthConfig          `mapstructure:"auth"`
+	Storage         StorageConfig       `mapstructure:"storage"`
+	RateLimit       RateLimitConfig     `mapstructure:"ratelimit"`
+	Security        SecurityConfig      `mapstructure:"security"`
 	trustedNetworks []*net.IPNet
 	trustedIPs      map[string]bool
 }
@@ -57,20 +58,24 @@ type RedisConfig struct {
 	DB       int    `mapstructure:"db"`
 }
 
-type MailConfig struct {
-	Host     string `mapstructure:"host"`
-	Port     int    `mapstructure:"port"`
-	Username string `mapstructure:"username"`
-	Password string `mapstructure:"password"`
-	Email    string `mapstructure:"email"`
-}
-
 type RabbitMQConfig struct {
 	Host     string `mapstructure:"host"`
 	Port     int    `mapstructure:"port"`
 	User     string `mapstructure:"user"`
 	Password string `mapstructure:"password"`
 	Vhost    string `mapstructure:"vhost"`
+}
+
+type ElasticSearchConfig struct {
+	Addresses []string `mapstructure:"addresses"`
+}
+
+type MailConfig struct {
+	Host     string `mapstructure:"host"`
+	Port     int    `mapstructure:"port"`
+	Username string `mapstructure:"username"`
+	Password string `mapstructure:"password"`
+	Email    string `mapstructure:"email"`
 }
 
 type JWTConfig struct {

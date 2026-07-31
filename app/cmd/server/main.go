@@ -21,6 +21,7 @@ import (
 	"app/internal/infra/caching"
 	"app/internal/infra/database"
 	"app/internal/infra/email"
+	"app/internal/infra/search"
 	"app/internal/infra/storage"
 	httpInterface "app/internal/interfaces/http"
 	"app/internal/pkg/config"
@@ -100,6 +101,12 @@ func main() {
 	// Initialize token manager
 	tokenManager := token.NewTokenManager(cfg.JWT.Secret, cfg.JWT.AccessDuration, cfg.JWT.Issuer)
 
+	//Initialize ElasticSearch
+	es, err := search.NewElasticSearch(cfg.ElasticSearch.Addresses) // Pass ES config host URLs!
+	if err != nil {
+		logger.Fatal("Failed to initialize Elastic Search", zap.Error(err)) // Stop app if search fails to start
+	}
+
 	// Initialize services
 	userService := services.NewUserService(userRepo, invitesRepo, mail, cache, cfg)
 	authService := services.NewAuthService(userRepo, invitesRepo, cache, cfg)
@@ -107,11 +114,12 @@ func main() {
 	categoryService := services.NewCategoryService(categoryRepo)
 	authEmailService := services.NewAuthorizedEmailService(authEmailRepo, userRepo)
 	mediaService := services.NewMediaService(mediaRepo, storageSvc, cfg.Storage.MaxFileSize, cfg.Storage.PublicURL)
+	searchService := services.NewSearchService(es)
 
 	// Initialize HTTP handlers
 	authHandler := handlers.NewAuthHandler(authService, cfg)
 	userHandler := handlers.NewUserHandler(userService)
-	articleHandler := handlers.NewArticleHandler(articleService)
+	articleHandler := handlers.NewArticleHandler(articleService, searchService)
 	categoryHandler := handlers.NewCategoryHandler(categoryService)
 	authEmailHandler := handlers.NewAuthorizedEmailHandler(authEmailService)
 	mediaHandler := handlers.NewMediaHandler(mediaService)

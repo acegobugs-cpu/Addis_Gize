@@ -19,13 +19,15 @@ import (
 type ArticleHandler struct {
 	handler        *Handler
 	articleService *services.ArticleService
+	searchService  *services.SearchService
 }
 
 // NewArticleHandler creates a new article handler
-func NewArticleHandler(articleService *services.ArticleService) *ArticleHandler {
+func NewArticleHandler(articleService *services.ArticleService, searchService *services.SearchService) *ArticleHandler {
 	return &ArticleHandler{
 		handler:        NewHandler(),
 		articleService: articleService,
+		searchService:  searchService,
 	}
 }
 
@@ -247,12 +249,30 @@ func (h *ArticleHandler) LanArticles(w http.ResponseWriter, r *http.Request) {
 // SearchArticles handles searching articles
 func (h *ArticleHandler) SearchArticles(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	locale := chi.URLParam(r, "lan")
 	query := r.URL.Query().Get("q")
+
 	if query == "" {
 		h.handler.RespondError(w, errors.ErrInvalidInput.W("Missing search query", ""))
 		return
 	}
-	res, err := h.articleService.SearchArticles(ctx, query, 10, 0) // Example: limit=10, offset=0
+
+	// Default values
+	limit := 10
+	from := 0
+
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsedLimit, err := strconv.Atoi(l); err == nil && parsedLimit > 0 {
+			limit = parsedLimit
+		}
+	}
+	if page := r.URL.Query().Get("page"); page != "" {
+		if parsedPage, err := strconv.Atoi(page); err == nil && parsedPage > 1 {
+			from = (parsedPage - 1) * limit
+		}
+	}
+
+	res, err := h.searchService.Search(ctx, locale, query, from, limit)
 	if err != nil {
 		h.handler.RespondError(w, err)
 		return

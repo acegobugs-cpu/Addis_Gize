@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"app/internal/infra/search"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -32,14 +33,16 @@ type AITranslationResponse struct {
 }
 
 type TranslationWorker struct {
-	pool     *pgxpool.Pool // Uses your existing pgxpool connection
-	aiClient *openai.Client
+	pool      *pgxpool.Pool // Uses your existing pgxpool connection
+	aiClient  *openai.Client
+	searchSvc *search.ElasticSearch
 }
 
-func NewTranslationWorker(pool *pgxpool.Pool, aiClient *openai.Client) *TranslationWorker {
+func NewTranslationWorker(pool *pgxpool.Pool, aiClient *openai.Client, search *search.ElasticSearch) *TranslationWorker {
 	return &TranslationWorker{
-		pool:     pool,
-		aiClient: aiClient,
+		pool:      pool,
+		aiClient:  aiClient,
+		searchSvc: search,
 	}
 }
 
@@ -124,6 +127,20 @@ func (w *TranslationWorker) ProcessArticle(ctx context.Context, articleID uuid.U
 			log.Printf("  ❌ DB Save error (%s): %v\n", targetLang, err)
 		} else {
 			log.Printf("  ✅ Added '%s' translation!\n", targetLang)
+
+			plainContent := extractTextFromTiptap(string(translated.Content))
+
+			// Sync to Elasticsearch
+			_ = w.searchSvc.IndexArticle(ctx, search.ArticleDocument{
+				ID:          fmt.Sprintf("%s_%s", articleID, targetLang),
+				ArticleID:   articleID.String(),
+				Locale:      targetLang,
+				Title:       translated.Title,
+				Slug:        slug,
+				Description: translated.Description,
+				ContentText: plainContent,
+				CreatedAt:   time.Now().Format(time.RFC3339),
+			})
 		}
 	}
 
@@ -216,4 +233,19 @@ func (w *TranslationWorker) translateWithRetry(ctx context.Context, req openai.C
 		return resp, err
 	}
 	return openai.ChatCompletionResponse{}, nil
+}
+
+func extractTextFromTiptap(tiptapJSON string) string {
+	// Simple regex filter to extract all "text":"..." values from Tiptap schema
+	re := regexp.MustCompile(`"text"\s*:\s*"([^"]+)"`)
+	matches := re.FindAllStringSubmatch(tiptapJSON, -1)
+
+	var sb strings.Builder
+	for _, m := range matches {
+		if len(m) > 1 {
+			sb.WriteString(m[1])
+			sb.WriteString(" ")
+		}
+	}
+	return strings.TrimSpace(sb.String())
 }
