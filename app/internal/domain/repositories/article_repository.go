@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"encoding/json"
 	errs "errors"
 	"fmt"
 
@@ -620,6 +621,99 @@ func (r *ArticleRepository) Search(ctx context.Context, query string, limit, off
 	return articles, nil
 }
 
+func (r *ArticleRepository) ListByCategory(ctx context.Context, lang, cat string) (*entities.CategoryArticle, error) {
+	// Query to get categories with their articles filtered by language
+	query := `
+		SELECT 
+			c.id AS category_id,
+			c.name AS category_name,
+			c.slug AS category_slug,
+			a.id AS article_id,
+			a.tag,
+			a.media,
+			al.locale,
+			al.title,
+			al.slug AS article_slug,
+			al.description,
+			al.content,
+			al.published_at,
+			al.updated_at
+		FROM categories c
+		INNER JOIN article_category ac ON c.id = ac.category_id
+		INNER JOIN articles a ON ac.article_id = a.id
+		INNER JOIN article_locale al ON a.id = al.article_id
+		WHERE al.locale = $1 AND c.slug = $2
+		ORDER BY al.published_at DESC
+	`
+
+	rows, err := r.db.Query(ctx, query, lang, cat)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query articles by categories: %w", err)
+	}
+	defer rows.Close()
+
+	var result *entities.CategoryArticle
+
+	for rows.Next() {
+		var (
+			catID    uuid.UUID
+			catName  string
+			catSlug  string
+			story    entities.Story
+			rawMedia []byte // Use []byte to safely unmarshal JSONB media columns
+		)
+
+		err := rows.Scan(
+			&catID,
+			&catName,
+			&catSlug,
+			&story.ID,
+			&story.Tag,
+			&rawMedia,
+			&story.Locale,
+			&story.Title,
+			&story.Slug,
+			&story.Description,
+			&story.Content,
+			&story.PublishedAt,
+			&story.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+
+		// Unmarshal media JSON into map/struct if present
+		if len(rawMedia) > 0 {
+			var mediaMap map[string]any
+			if err := json.Unmarshal(rawMedia, &mediaMap); err == nil {
+				story.Media = mediaMap
+			}
+		}
+
+		// Initialize CategoryArticle on first iteration
+		if result == nil {
+			result = &entities.CategoryArticle{
+				ID:       catID.String(),
+				Name:     catName,
+				Slug:     catSlug,
+				Articles: []*entities.Story{},
+			}
+		}
+
+		result.Articles = append(result.Articles, &story)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration error: %w", err)
+	}
+
+	// Handle case where category exists but has no articles, or category doesn't exist
+	if result == nil {
+		return nil, fmt.Errorf("no category or articles found for slug: %s in lang: %s", cat, lang)
+	}
+
+	return result, nil
+}
 func (r *ArticleRepository) ListByCategories(ctx context.Context, lang string) ([]*entities.CategoryArticle, error) {
 	// Query to get categories with their articles filtered by language
 	query := `

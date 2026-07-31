@@ -123,6 +123,15 @@ func (s *ArticleService) SearchArticles(ctx context.Context, query string, limit
 	return articles, nil
 }
 
+func (s *ArticleService) ListArticlesByCategory(ctx context.Context, lang, cat string) (*entities.CategoryArticle, error) {
+	categories, err := s.articleRepo.ListByCategory(ctx, lang, cat)
+	if err != nil {
+		logger.LogError(ctx, err, "")
+		return nil, errors.ErrInternalServer.W("Failed to list articles by categories", "")
+	}
+	return categories, nil
+}
+
 func (s *ArticleService) ListArticlesByCategories(ctx context.Context, lang string) ([]*entities.CategoryArticle, error) {
 	categories, err := s.articleRepo.ListByCategories(ctx, lang)
 	if err != nil {
