@@ -658,10 +658,10 @@ func (r *ArticleRepository) Search(ctx context.Context, query string, limit, off
 		FROM articles a
 		INNER JOIN article_locale al ON a.id = al.article_id
 		WHERE al.title ILIKE $1 OR al.description ILIKE $1
-		ORDER BY a.published_at DESC LIMIT $2 OFFSET $3
+		ORDER BY a.published_at DESC
 	`
 	searchPattern := "%" + query + "%"
-	rows, err := r.db.Query(ctx, searchQuery, searchPattern, limit, offset)
+	rows, err := r.db.Query(ctx, searchQuery, searchPattern)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search articles: %w", err)
 	}
