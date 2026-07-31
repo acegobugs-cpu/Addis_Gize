@@ -620,6 +620,101 @@ func (r *ArticleRepository) Search(ctx context.Context, query string, limit, off
 	return articles, nil
 }
 
+func (r *ArticleRepository) ListByCategories(ctx context.Context, lang string) ([]*entities.CategoryArticle, error) {
+	// Query to get categories with their articles filtered by language
+	query := `
+		SELECT 
+			c.id AS category_id,
+			c.name AS category_name,
+			c.slug AS category_slug,
+			a.id AS article_id,
+			a.tag,
+			a.media,
+			al.locale,
+			al.title,
+			al.slug AS article_slug,
+			al.description,
+			al.content,
+			al.published_at,
+			al.updated_at
+		FROM categories c
+		INNER JOIN article_category ac ON c.id = ac.category_id
+		INNER JOIN articles a ON ac.article_id = a.id
+		INNER JOIN article_locale al ON a.id = al.article_id
+		WHERE al.locale = $1
+		ORDER BY c.name ASC, al.published_at DESC
+	`
+
+	rows, err := r.db.Query(ctx, query, lang)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query articles by categories: %w", err)
+	}
+	defer rows.Close()
+
+	// Map to track and build unique CategoryArticle objects
+	categoryMap := make(map[uuid.UUID]*entities.CategoryArticle)
+	var categoryIDs []uuid.UUID
+
+	for rows.Next() {
+		var (
+			catID    uuid.UUID
+			catName  string
+			catSlug  string
+			story    entities.Story
+			mediaMap map[string]any
+		)
+
+		err := rows.Scan(
+			&catID,
+			&catName,
+			&catSlug,
+			&story.ID,
+			&story.Tag,
+			&mediaMap,
+			&story.Locale,
+			&story.Title,
+			&story.Slug,
+			&story.Description,
+			&story.Content,
+			&story.PublishedAt,
+			&story.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+
+		// Convert JSON map to your Media entity if needed
+		story.Media = mediaMap
+
+		// Check if category already exists in map
+		catArticle, exists := categoryMap[catID]
+		if !exists {
+			catArticle = &entities.CategoryArticle{
+				ID:       catID.String(),
+				Name:     catName,
+				Slug:     catSlug,
+				Articles: []*entities.Story{},
+			}
+			categoryMap[catID] = catArticle
+			categoryIDs = append(categoryIDs, catID)
+		}
+
+		catArticle.Articles = append(catArticle.Articles, &story)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration error: %w", err)
+	}
+
+	// Preserve category order
+	result := make([]*entities.CategoryArticle, 0, len(categoryIDs))
+	for _, id := range categoryIDs {
+		result = append(result, categoryMap[id])
+	}
+
+	return result, nil
+}
+
 func (r *ArticleRepository) AddCategory(ctx context.Context, articleID uuid.UUID, categoryID uuid.UUID) error {
 	query := `
 		INSERT INTO article_category (article_id, category_id)

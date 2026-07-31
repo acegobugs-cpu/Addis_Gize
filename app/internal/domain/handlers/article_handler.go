@@ -218,3 +218,20 @@ func (h *ArticleHandler) SearchArticles(w http.ResponseWriter, r *http.Request) 
 
 	h.handler.RespondJSON(w, http.StatusOK, res)
 }
+
+func (h *ArticleHandler) ArticlesByCategories(w http.ResponseWriter, r *http.Request) {
+	// Extract 'lan' path param from chi router
+	lang := chi.URLParam(r, "lan")
+	if lang == "" {
+		h.handler.RespondError(w, errors.ErrBadRequest.W("Language parameter is required", ""))
+		return
+	}
+
+	categories, err := h.articleService.ListArticlesByCategories(r.Context(), lang)
+	if err != nil {
+		h.handler.RespondError(w, err)
+		return
+	}
+
+	h.handler.RespondJSON(w, http.StatusOK, categories)
+}

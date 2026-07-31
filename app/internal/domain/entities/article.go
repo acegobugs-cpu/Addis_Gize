@@ -84,6 +84,13 @@ type Story struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+type CategoryArticle struct {
+	ID       string   `json:"id"`
+	Name     string   `json:"name"`
+	Slug     string   `json:"slug"`
+	Articles []*Story `json:"articles"`
+}
+
 type TranslationPatch struct {
 	ID          *uuid.UUID     `json:"id,omitempty"`
 	EditorID    *uuid.UUID     `json:"editor_id,omitempty"`

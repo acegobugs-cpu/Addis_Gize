@@ -7,6 +7,7 @@ import (
 	"app/internal/domain/entities"
 	"app/internal/domain/repositories"
 	"app/internal/pkg/errors"
+	"app/internal/pkg/logger"
 
 	"github.com/google/uuid"
 )
@@ -120,6 +121,15 @@ func (s *ArticleService) SearchArticles(ctx context.Context, query string, limit
 		return nil, errors.ErrInternalServer.W("Failed to search articles", "")
 	}
 	return articles, nil
+}
+
+func (s *ArticleService) ListArticlesByCategories(ctx context.Context, lang string) ([]*entities.CategoryArticle, error) {
+	categories, err := s.articleRepo.ListByCategories(ctx, lang)
+	if err != nil {
+		logger.LogError(ctx, err, "")
+		return nil, errors.ErrInternalServer.W("Failed to list articles by categories", "")
+	}
+	return categories, nil
 }
 
 // GetArticlesByCategory retrieves articles by category
