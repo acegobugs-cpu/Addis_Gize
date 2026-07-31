@@ -6,10 +6,11 @@ import Select from "react-select";
 import { ArrowLeftIcon, TrashIcon } from "@heroicons/react/24/outline";
 
 import { deleteLocale, getCategories, updateArticle, getArticleById } from "@/app/lib/api";
-import { Article, ArticleTranslation, Category } from "@/app/types/types";
+import { Article, ArticleTranslation } from "@/app/types/article";
 import MediaBlock from "@/app/(main)/components/mediaBlock";
 import TextEditor from "@/app/(main)/components/editor/textEditor";
 import { Struct } from "next/dist/compiled/superstruct";
+import { Category } from "@/app/types/category";
 
 
 

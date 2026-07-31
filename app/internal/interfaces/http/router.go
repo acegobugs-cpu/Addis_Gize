@@ -219,10 +219,12 @@ func (r *Router) setupRoutes(l *limiter.Limiter) {
 				router.Use(r.csrfProtection.Middleware)
 				router.Use(r.authMiddleware.Middleware)
 				router.Post("/", r.articleHandler.CreateArticle)
+				router.Post("/locale", r.articleHandler.AddLocale)
 			})
 
 			router.Route("/{id}", func(router chi.Router) {
 				router.Get("/", r.articleHandler.GetArticleByID)
+				router.Get("/lan", r.articleHandler.GetArticleLocales)
 				router.Group(func(router chi.Router) {
 					router.Use(r.csrfProtection.Middleware)
 					router.Use(r.authMiddleware.Middleware)

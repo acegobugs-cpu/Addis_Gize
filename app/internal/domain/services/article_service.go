@@ -26,6 +26,15 @@ func NewArticleService(articleRepo *repositories.ArticleRepository, categoryRepo
 	}
 }
 
+type AddLocaleReq struct {
+	ArticleID   *uuid.UUID     `json:"article_id"`
+	Locale      string         `json:"locale"`
+	Title       string         `json:"title"`
+	Slug        string         `json:"slug"`
+	Description string         `json:"description"`
+	Content     map[string]any `json:"content,omitempty"`
+}
+
 // CreateArticle creates a new article
 func (s *ArticleService) CreateArticle(ctx context.Context, article *entities.Article, categoryIDs []uuid.UUID) error {
 	// Validate categories
@@ -51,6 +60,14 @@ func (s *ArticleService) CreateArticle(ctx context.Context, article *entities.Ar
 	return nil
 }
 
+// CreateArticleLocale creates a new article locale
+func (s *ArticleService) CreateArticleLocale(ctx context.Context, locale *entities.ArticleLocale) error {
+	if err := s.articleRepo.CreateLocale(ctx, locale); err != nil {
+		return errors.ErrInternalServer.W("Failed to create article locale", "")
+	}
+	return nil
+}
+
 // UpdateArticle updates an article
 func (s *ArticleService) UpdateArticle(ctx context.Context, id uuid.UUID, patch entities.ArticlePatch) (*entities.Article, error) {
 	// 1. Fetch existing article from storage
@@ -73,6 +90,14 @@ func (s *ArticleService) UpdateArticle(ctx context.Context, id uuid.UUID, patch 
 // GetArticleByID retrieves an article by ID
 func (s *ArticleService) GetArticleByID(ctx context.Context, id uuid.UUID) (*entities.Article, error) {
 	article, err := s.articleRepo.FindArticleByID(ctx, id)
+	if err != nil {
+		return nil, errors.ErrResourceNotFound
+	}
+	return article, nil
+}
+
+func (s *ArticleService) GetArticleLocales(ctx context.Context, id uuid.UUID) (*entities.Article, error) {
+	article, err := s.articleRepo.FindArticleLocales(ctx, id)
 	if err != nil {
 		return nil, errors.ErrResourceNotFound
 	}
@@ -153,14 +178,6 @@ func (s *ArticleService) GetArticlesByCategory(ctx context.Context, categoryID u
 		return nil, errors.ErrInternalServer.W("Failed to get articles by category", "")
 	}
 	return articles, nil
-}
-
-// CreateArticleLocale creates a new article locale
-func (s *ArticleService) CreateArticleLocale(ctx context.Context, locale *entities.ArticleLocale) error {
-	if err := s.articleRepo.CreateLocale(ctx, locale); err != nil {
-		return errors.ErrInternalServer.W("Failed to create article locale", "")
-	}
-	return nil
 }
 
 // UpdateArticleLocale updates an article locale

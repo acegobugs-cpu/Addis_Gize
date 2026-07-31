@@ -3,11 +3,12 @@
 import { useState, useEffect, useRef } from "react";
 import Select from "react-select";
 import { useAuth } from "@/app/components/AuthContext";
-import { Media, Category } from "@/app/types/types";
+import { Category } from "@/app/types/category";
 import MediaBlock from "../../components/mediaBlock";
 import TextEditor, { TextEditorRef } from "../../components/editor/textEditor";
 import { createArticle, getCategories } from "@/app/lib/api";
 import MediaRenderer from "../../components/mediaRenderer";
+import { Media } from "@/app/types/media";
 
 export default function ArticleForm() {
   const editorRef = useRef<TextEditorRef>(null);

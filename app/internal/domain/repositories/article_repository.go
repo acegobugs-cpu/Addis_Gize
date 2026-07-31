@@ -296,6 +296,71 @@ func (r *ArticleRepository) FindArticleByID(ctx context.Context, id uuid.UUID) (
 	return article, nil
 }
 
+func (r *ArticleRepository) FindArticleLocales(ctx context.Context, id uuid.UUID) (*entities.Article, error) {
+	query := `
+		SELECT 
+			a.id, 
+			a.tag, 
+			al.id,
+			al.article_id,
+			al.locale,
+			al.title,
+			al.slug
+		FROM articles a
+		INNER JOIN article_locale al ON a.id = al.article_id
+		WHERE a.id = $1
+	`
+
+	rows, err := r.db.Query(ctx, query, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find article by ID: %w", err)
+	}
+	defer rows.Close()
+
+	var article *entities.Article
+
+	for rows.Next() {
+		var (
+			articleID  uuid.UUID
+			tag        string
+			localeItem entities.ArticleLocale
+		)
+
+		err := rows.Scan(
+			&articleID,
+			&tag,
+			&localeItem.ID,
+			&localeItem.ArticleID,
+			&localeItem.Locale,
+			&localeItem.Title,
+			&localeItem.Slug,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan article row: %w", err)
+		}
+
+		if article == nil {
+			article = &entities.Article{
+				ID:           articleID,
+				Tag:          tag,
+				Translations: []*entities.ArticleLocale{},
+			}
+		}
+
+		article.Translations = append(article.Translations, &localeItem)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration error: %w", err)
+	}
+
+	if article == nil {
+		return nil, errors.ErrResourceNotFound
+	}
+
+	return article, nil
+}
+
 func (r *ArticleRepository) FindBySlug(ctx context.Context, slug string) (*entities.Story, error) {
 	query := `
 		SELECT 

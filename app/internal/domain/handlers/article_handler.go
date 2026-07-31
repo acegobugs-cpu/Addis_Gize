@@ -67,8 +67,7 @@ func (h *ArticleHandler) CreateArticle(w http.ResponseWriter, r *http.Request) {
 
 	// Create locales
 	for _, transReq := range req.Translations {
-		locale := entities.NewArticleLocale(nil, editorID, transReq.Locale, transReq.Title, transReq.Slug, transReq.Description)
-		locale.Content = transReq.Content
+		locale := entities.NewArticleLocale(nil, editorID, transReq.Locale, transReq.Title, transReq.Slug, transReq.Description, transReq.Content)
 		article.Translations = append(article.Translations, locale)
 	}
 
@@ -78,6 +77,32 @@ func (h *ArticleHandler) CreateArticle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.handler.RespondJSON(w, http.StatusCreated, article)
+}
+
+func (h *ArticleHandler) AddLocale(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	var req services.AddLocaleReq
+	if err := h.handler.ParseJSON(r, &req); err != nil {
+		h.handler.RespondError(w, errors.ErrInvalidInput)
+		return
+	}
+
+	// Get editor ID from context
+	editorID, ok := appContext.GetUserID(ctx)
+	if !ok {
+		h.handler.RespondError(w, errors.ErrUnauthorized)
+		return
+	}
+
+	// Create locale entity
+	locale := entities.NewArticleLocale(req.ArticleID, editorID, req.Locale, req.Slug, req.Title, req.Description, req.Content)
+
+	if err := h.articleService.CreateArticleLocale(r.Context(), locale); err != nil {
+		h.handler.RespondError(w, err)
+		return
+	}
+
+	h.handler.RespondJSON(w, http.StatusCreated, locale)
 }
 
 // UpdateArticle handles updating an article
@@ -117,6 +142,23 @@ func (h *ArticleHandler) GetArticleByID(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	article, err := h.articleService.GetArticleByID(r.Context(), id)
+	if err != nil {
+		h.handler.RespondError(w, err)
+		return
+	}
+
+	// 3. Return the article JSON
+	h.handler.RespondJSON(w, http.StatusOK, article)
+}
+
+func (h *ArticleHandler) GetArticleLocales(w http.ResponseWriter, r *http.Request) {
+	// Extract article ID from URL params
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		h.handler.RespondError(w, errors.ErrBadRequest)
+		return
+	}
+	article, err := h.articleService.GetArticleLocales(r.Context(), id)
 	if err != nil {
 		h.handler.RespondError(w, err)
 		return

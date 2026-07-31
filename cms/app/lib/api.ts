@@ -1,21 +1,10 @@
 "use server";
 
+import { Article, ArticleTranslation, ArticleUpdate } from "../types/article";
+import { Category } from "../types/category";
+import { Invite, User } from "../types/user";
 // 1. Import your advanced BackendClient instance 
 import { client as backend } from "./client"; // Adjust path to your BackendClient file
-import {
-  LoginData,
-  RegisterData,
-  AuthResponse,
-  User,
-  Article,
-  Category,
-  MediaFile,
-  ArticleTranslation,
-  ArticleUpdate,
-  Invite,
-  Story,
-} from "../types/types";
-
 // 1. Mirror your Go AppError struct in TypeScript
 interface AppResponse<T = any> {
   success: boolean;
@@ -28,10 +17,10 @@ interface AppResponse<T = any> {
 /**
  * Robust helper utility to process Go AppError & success payloads uniformly.
  */
-async function handleResponse<T>(response: Response): Promise<T> {
+async function handleResponse<T>(response: Response): Promise<AppResponse<T>> {
   // Handle HTTP No Content safely
   if (response.status === 204) {
-    return {} as T;
+    return {} as AppResponse<T>;
   }
 
   let body: AppResponse<T> | null = null;
@@ -48,7 +37,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
   }
 
   // Fallback if the backend returned a flat object/array instead of nesting it in "data"
-  return (body as T) || ([] as unknown as T);
+  return (body as AppResponse<T>) || ([] as unknown as T);
 }
 
 // ==========================================
@@ -135,10 +124,6 @@ export async function createArticle(data: Partial<Article>) {
 }
 
 export async function updateArticle(article_id: string, data: Partial<ArticleUpdate>) {
-  console.log(
-    "payload attrs:",
-    JSON.stringify(data.translation?.content?.content?.[0])
-  );
   const res = await backend.patch(`/articles/${article_id}`, data);
   return handleResponse<ArticleUpdate>(res);
 }
@@ -152,12 +137,17 @@ export async function deleteArticle(id: string) {
 // LOCALE ACTIONS
 // ==========================================
 
+export async function getArticleLocales(id: string){
+  const res = await backend.get(`/articles/${id}/lan`);
+  return handleResponse<Article>(res);
+}
+
 export async function addLocale(data: Partial<ArticleTranslation>) {
-  const res = await backend.post("/locale", data);
+  const res = await backend.post(`/articles/locale`, data);
   return handleResponse<ArticleTranslation>(res);
 }
 
-export async function deleteLocale(id: number) {
+export async function deleteLocale(id: string) {
   const res = await backend.delete(`/delete/locale/${id}`);
   return handleResponse<any>(res);
 }
@@ -168,7 +158,7 @@ export async function deleteLocale(id: number) {
 
 export async function getCategories() {
   const res = await backend.get("/categories");
-  return handleResponse<AppResponse<Category[]>>(res);
+  return handleResponse<Category[]>(res);
 }
 
 export async function getCategoryById(id: string) {

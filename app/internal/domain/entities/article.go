@@ -48,7 +48,7 @@ type ArticleLocale struct {
 }
 
 // NewArticleLocale creates a new article locale entity
-func NewArticleLocale(articleID *uuid.UUID, editorID uuid.UUID, locale, title, slug, description string) *ArticleLocale {
+func NewArticleLocale(articleID *uuid.UUID, editorID uuid.UUID, locale, slug, title, description string, content map[string]any) *ArticleLocale {
 	now := time.Now()
 	return &ArticleLocale{
 		ArticleID:   articleID,
@@ -57,6 +57,7 @@ func NewArticleLocale(articleID *uuid.UUID, editorID uuid.UUID, locale, title, s
 		Title:       title,
 		Slug:        slug,
 		Description: description,
+		Content:     content,
 		PublishedAt: now,
 		UpdatedAt:   now,
 	}

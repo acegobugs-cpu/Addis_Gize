@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS article_locale (
     content JSONB,
     published_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (locale, slug)
+    UNIQUE (locale, article_id)
 );
 CREATE INDEX IF NOT EXISTS idx_article_locale_article_id ON article_locale(article_id);
 CREATE INDEX IF NOT EXISTS idx_article_locale_locale ON article_locale(locale);
