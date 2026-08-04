@@ -128,7 +128,7 @@ func (w *TranslationWorker) ProcessArticle(ctx context.Context, articleID uuid.U
 		} else {
 			log.Printf("  ✅ Added '%s' translation!\n", targetLang)
 
-			plainContent := extractTextFromTiptap(string(translated.Content))
+			plainContent := ExtractTextFromTiptap(string(translated.Content))
 
 			// Sync to Elasticsearch
 			_ = w.searchSvc.IndexArticle(ctx, search.ArticleDocument{
@@ -235,7 +235,7 @@ func (w *TranslationWorker) translateWithRetry(ctx context.Context, req openai.C
 	return openai.ChatCompletionResponse{}, nil
 }
 
-func extractTextFromTiptap(tiptapJSON string) string {
+func ExtractTextFromTiptap(tiptapJSON string) string {
 	// Simple regex filter to extract all "text":"..." values from Tiptap schema
 	re := regexp.MustCompile(`"text"\s*:\s*"([^"]+)"`)
 	matches := re.FindAllStringSubmatch(tiptapJSON, -1)
