@@ -1,4 +1,4 @@
-import { Article, Story } from "@/types/article";
+import { Article, SearchHit, Story } from "@/types/article";
 import { CategoryArticle } from "@/types/category";
 import axios from "axios";
 import CategoryArticleList from "../[locale]/section/[slug]/catList";

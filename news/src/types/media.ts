@@ -9,7 +9,6 @@ export interface MediaFile {
 
 export interface Media {
   mediaType: "image" | "video" | "audio" | "embed";
-  source: "external" | "local";
   url: string;
   alt?: string;
 }

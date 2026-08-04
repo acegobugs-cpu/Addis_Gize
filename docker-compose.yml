@@ -1,5 +1,10 @@
+# Root docker-compose.yml
+
+include:
+  - ./app/docker-compose.yml   # <--- Path to your backend compose file
+
 services:
-  #--- Nginx Reverse proxy ---
+  # --- Nginx Reverse Proxy ---
   nginx:
     image: nginx:1.25-alpine
     container_name: nginx
@@ -9,16 +14,13 @@ services:
       - "443:443"
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d
-      # - ./nginx/certs:/etc/letsencrypt
       - ./nginx/www:/var/www/certbot
       - ./nginx/crt:/etc/nginx/certs:ro
     depends_on:
-      - public
-      - admin
-      - api
+      - postgres
       - minio
     networks:
-      - internal
+      - dailytimes-network
 
   # --- CertBot ---
   certbot:
@@ -28,13 +30,40 @@ services:
       - ./nginx/certs:/etc/letsencrypt
       - ./nginx/www:/var/www/certbot
     networks:
-      - internal
+      - dailytimes-network
 
+  # # --- Next.js Frontend ---
+  # news:
+  #   build:
+  #     context: ./news
+  #     dockerfile: Dockerfile
+  #   container_name: dailytimes-news
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - NEXT_PUBLIC_API_URL=http://localhost:8080
+  #   depends_on:
+  #     - app # Refers to the Go app service defined in ./app/docker-compose.yml
+  #   networks:
+  #     - dailytimes-network
+  #   restart: unless-stopped
 
-# --- Volumes ---
-volumes:
+  # --- Go Backend ---
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: dailytimes-app
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    networks:
+      - dailytimes-network
+    restart: unless-stopped
 
-# --- Networks ---
 networks:
-  internal:
+  dailytimes-network:
     driver: bridge

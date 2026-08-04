@@ -1,17 +1,16 @@
+import { Media } from "@/types/media";
+
 export default function MediaRenderer({
   media,
   className = "",
   controls = true,
   autoPlay = false,
   loop = false,
-}) {
+}:{media: Media | undefined; className?: string; controls?: boolean; autoPlay?: boolean; loop?: boolean}) {
   if (!media || !media.url || !media.mediaType) {
     return <p className="text-gray-400 italic">No media provided</p>;
   }
   let src = media.url;
-  if (media.source === "local" && !src.startsWith("http")) {
-    src = `${process.env.NEXT_PUBLIC_API_URL}${media.url}`;
-  }
 
   switch (media.mediaType) {
     case "image":

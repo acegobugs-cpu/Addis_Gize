@@ -3,20 +3,20 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useParams, notFound } from 'next/navigation'; 
 import i18n from '../../i18n'; // make sure this path is correct
+import { isValidLocale } from '@/types/locale';
 
-const LocaleContext = createContext();
+const LocaleContext = createContext<string | undefined>(undefined);
 export const useLocale = () => useContext(LocaleContext);
 
 
-export default function TranslationProvider({ children }) {
+export default function TranslationProvider({ children }:{children: React.ReactNode}) {
   const [isLoaded, setIsLoaded] = useState(false);
-  const languages = ['om', 'am', 'en', 'sw']; // supported languages
-  const { locale } = useParams();
+  const { locale } = useParams<{ locale: string }>();
 
   useEffect(() => {
-    if (!languages.includes(locale)) {
+    if (!isValidLocale(locale)) {
       notFound();
-      return null;
+      return;
     }
 
     if (i18n.language !== locale) {
