@@ -30,7 +30,7 @@ func main() {
 	defer pg.Close(ctx)
 
 	// 2. Configure OpenAI SDK to point to Gemini's free endpoint
-	geminiAPIKey := "Open_api_key" // Or get it from cfg.GeminiAPIKey
+	geminiAPIKey := cfg.AI.OpenAI_API_Key // Or get it from cfg.GeminiAPIKey
 	if geminiAPIKey == "" {
 		log.Fatal("GEMINI_API_KEY environment variable is missing")
 	}

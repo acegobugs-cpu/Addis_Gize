@@ -17,6 +17,7 @@ type Config struct {
 	Redis           RedisConfig         `mapstructure:"redis"`
 	RabbitMQ        RabbitMQConfig      `mapstructure:"rabbitmq"`
 	ElasticSearch   ElasticSearchConfig `mapstructure:"elasticsearch"`
+	AI              AIConfig            `mapstructure:"ai"`
 	Mail            MailConfig          `mapstructure:"mail"`
 	JWT             JWTConfig           `mapstructure:"jwt"`
 	GRPC            GRPCConfig          `mapstructure:"grpc"`
@@ -68,6 +69,10 @@ type RabbitMQConfig struct {
 
 type ElasticSearchConfig struct {
 	Addresses []string `mapstructure:"addresses"`
+}
+
+type AIConfig struct {
+	OpenAI_API_Key string `mapstructure:"openai_api_key"`
 }
 
 type MailConfig struct {
