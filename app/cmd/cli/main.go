@@ -23,7 +23,7 @@ func main() {
 	command := os.Args[1]
 
 	ctx := context.Background()
-	cfg, err := config.Load("configs/config.yaml")
+	cfg, err := config.Load("configs/config.docker.yaml")
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}

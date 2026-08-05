@@ -9,13 +9,18 @@ export interface ResponseType<T> {
   data: T;
 }
 
-// 2. Axios Instance Setup
+const baseURL = process.env.NEXT_PUBLIC_API_URL
+  ? `${process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "")}/api/v1`
+  : "http://localhost:8080/api/v1";
+
 const API = axios.create({
-  baseURL: `${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1`,
+  baseURL,
   headers: {
     "Content-Type": "application/json",
   },
 });
+
+console.log(API.defaults.baseURL); // Works cleanly!
 
 export const REVALIDATE_DURATION = 30; // 30 seconds
 

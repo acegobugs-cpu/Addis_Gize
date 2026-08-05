@@ -41,6 +41,7 @@ Thumbs.db
 
 # Config files (keep example)
 configs/config.yaml
+configs/config.docker.yaml
 !configs/config.example.yaml
 
 # Database

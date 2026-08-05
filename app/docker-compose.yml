@@ -1,35 +1,9 @@
-services:
-  # app:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #   container_name: dailytimes-app
-  #   ports:
-  #     - "8080:8080"
-  #   environment:
-  #     - SERVER_ENVIRONMENT=production
-  #     - DATABASE_HOST=postgres
-  #     - DATABASE_PORT=5432
-  #     - DATABASE_USER=postgres
-  #     - DATABASE_PASSWORD=postgres
-  #     - DATABASE_DBNAME=dailytimes
-  #     - REDIS_HOST=redis
-  #     - REDIS_PORT=6379
-  #     - RABBITMQ_HOST=rabbitmq
-  #     - RABBITMQ_PORT=5672
-  #     - RABBITMQ_USER=guest
-  #     - RABBITMQ_PASSWORD=guest
-  #   depends_on:
-  #     - postgres
-  #     - redis
-  #     - rabbitmq
-  #   networks:
-  #     - dailytimes-network
-  #   restart: unless-stopped
+name: times-infra
 
+services:
   postgres:
-    image: postgres:15-alpine
-    container_name: dailytimes-postgres
+    image: postgres:16-alpine
+    container_name: times-postgres
     ports:
       - "5432:5432"
     env_file:
@@ -38,13 +12,13 @@ services:
       - postgres-data:/var/lib/postgresql/data
       - ./.docker/pg-init:/docker-entrypoint-initdb.d
     networks:
-      - dailytimes-network
+      - times-network
     restart: unless-stopped
 
   # --- MinIO Object Storage ---
   minio:
     image: minio/minio:latest
-    container_name: minio
+    container_name: times-minio
     env_file:
       - ./.env
     command: server /data --console-address ":9001"
@@ -54,23 +28,23 @@ services:
     volumes:
       - minio_data:/data
     networks:
-      - dailytimes-network
+      - times-network
     restart: always
 
   redis:
     image: redis:7-alpine
-    container_name: dailytimes-redis
+    container_name: times-redis
     ports:
       - "6379:6379"
     volumes:
       - redis-data:/data
     networks:
-      - dailytimes-network
+      - times-network
     restart: unless-stopped
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
-    container_name: dailytimes-rabbitmq
+    container_name: times-rabbitmq
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -79,45 +53,40 @@ services:
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     networks:
-      - dailytimes-network
+      - times-network
     restart: unless-stopped
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
-    container_name: dailytimes_elasticsearch
+    container_name: times-elasticsearch
     environment:
       - discovery.type=single-node
-      - xpack.security.enabled=false # Set to false for local development ease
+      - xpack.security.enabled=false
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     ports:
       - "9200:9200"
     volumes:
       - esdata:/usr/share/elasticsearch/data
+    networks:
+      - times-network
     healthcheck:
       test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'"]
       interval: 10s
       timeout: 10s
       retries: 5
 
-  # kibana:
-  #   image: docker.elastic.co/kibana/kibana:8.12.0
-  #   container_name: dailytimes_kibana
-  #   ports:
-  #     - "5601:5601"
-  #   environment:
-  #     - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-  #   depends_on:
-  #     elasticsearch:
-  #       condition: service_healthy
-
 networks:
-  dailytimes-network:
-    driver: bridge
+  times-network:
+    name: times-network # Pins global network name across both configs
 
 volumes:
   postgres-data:
+    name: times_postgres_data # Fixed global volume name
   minio_data:
+    name: times_minio_data
   redis-data:
+    name: times_redis_data
   rabbitmq-data:
+    name: times_rabbitmq_data
   esdata:
-    driver: local
+    name: times_esdata

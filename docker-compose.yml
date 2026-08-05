@@ -1,13 +1,14 @@
-# Root docker-compose.yml
+name: times
 
+# Import infrastructure & services from ./app/docker-compose.yml
 include:
-  - ./app/docker-compose.yml   # <--- Path to your backend compose file
+  - ./app/docker-compose.yml
 
 services:
   # --- Nginx Reverse Proxy ---
   nginx:
     image: nginx:1.25-alpine
-    container_name: nginx
+    container_name: times-nginx
     restart: always
     ports:
       - "80:80"
@@ -17,53 +18,58 @@ services:
       - ./nginx/www:/var/www/certbot
       - ./nginx/crt:/etc/nginx/certs:ro
     depends_on:
-      - postgres
-      - minio
+      - app
+      - news
     networks:
-      - dailytimes-network
+      - times-network
 
   # --- CertBot ---
   certbot:
     image: certbot/certbot
-    container_name: certbot
+    container_name: times-certbot
     volumes:
       - ./nginx/certs:/etc/letsencrypt
       - ./nginx/www:/var/www/certbot
     networks:
-      - dailytimes-network
+      - times-network
 
-  # # --- Next.js Frontend ---
-  # news:
-  #   build:
-  #     context: ./news
-  #     dockerfile: Dockerfile
-  #   container_name: dailytimes-news
-  #   ports:
-  #     - "3000:3000"
-  #   environment:
-  #     - NEXT_PUBLIC_API_URL=http://localhost:8080
-  #   depends_on:
-  #     - app # Refers to the Go app service defined in ./app/docker-compose.yml
-  #   networks:
-  #     - dailytimes-network
-  #   restart: unless-stopped
+  # --- Next.js Frontend ---
+  news:
+    build:
+      context: ./news
+      dockerfile: Dockerfile
+    container_name: times-news
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://app:8080
+    depends_on:
+      - app
+    networks:
+      - times-network
+    restart: unless-stopped
 
   # --- Go Backend ---
   app:
     build:
       context: ./app
       dockerfile: Dockerfile
-    container_name: dailytimes-app
+    container_name: times-app
     ports:
       - "8080:8080"
     depends_on:
-      - postgres
-      - redis
-      - rabbitmq
+      postgres:
+        condition: service_started
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+      elasticsearch:
+        condition: service_healthy
     networks:
-      - dailytimes-network
+      - times-network
     restart: unless-stopped
 
 networks:
-  dailytimes-network:
-    driver: bridge
+  times-network:
+    name: times-network

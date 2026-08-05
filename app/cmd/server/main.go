@@ -34,7 +34,7 @@ import (
 func main() {
 	ctx := context.Background()
 	// Load configuration
-	cfg, err := config.Load("configs/config.yaml")
+	cfg, err := config.Load("configs/config.docker.yaml")
 	if err != nil {
 		fmt.Printf("Failed to load config: %v\n", err)
 		os.Exit(1)

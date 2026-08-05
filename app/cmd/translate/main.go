@@ -18,7 +18,7 @@ func main() {
 	ctx := context.Background()
 
 	// 1. Load config & initialize database
-	cfg, err := config.Load("configs/config.yaml")
+	cfg, err := config.Load("configs/config.docker.yaml")
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
