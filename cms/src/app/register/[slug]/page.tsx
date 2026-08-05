@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { apiClient } from "@/app/lib/api";
+import { RegisterUser } from "@/app/lib/api";
 
 interface RegisterFormData {
   email: string;
@@ -48,7 +48,7 @@ export default function Register() {
     }
 
     try {
-      await apiClient.registerUser(slug, {
+      await RegisterUser(slug, {
         email: form.email,
         fname: form.fname,
         mname: form.mname,

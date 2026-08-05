@@ -2,7 +2,7 @@
 
 import { Article, ArticleTranslation, ArticleUpdate } from "../types/article";
 import { Category } from "../types/category";
-import { Invite, User } from "../types/user";
+import { AuthResponse, Invite, RegisterData, User } from "../types/user";
 // 1. Import your advanced BackendClient instance 
 import { client as backend } from "./client"; // Adjust path to your BackendClient file
 // 1. Mirror your Go AppError struct in TypeScript
@@ -44,15 +44,15 @@ async function handleResponse<T>(response: Response): Promise<AppResponse<T>> {
 // AUTH ACTIONS
 // ==========================================
 
-// export async function loginUser(email_or_username: string, password: string) {
-//   const res = await backend.post("/auth/login", { email_or_username, password });
-//   return handleResponse<{ email_or_username: string; password: string }>(res);
-// }
+export async function loginUser(email_or_username: string, password: string) {
+  const res = await backend.post("/auth/login", { email_or_username, password });
+  return handleResponse<{ email_or_username: string; password: string }>(res);
+}
 
-// export async function registerUser(slug: string, data: RegisterData) {
-//   const res = await backend.post(`/auth/register/${slug}`, data);
-//   return handleResponse<AuthResponse>(res);
-// }
+export async function RegisterUser(slug: string, data: RegisterData) {
+  const res = await backend.post(`/auth/register/${slug}`, data);
+  return handleResponse<AuthResponse>(res);
+}
 
 // ==========================================
 // INVITE / EMAIL ACTIONS
