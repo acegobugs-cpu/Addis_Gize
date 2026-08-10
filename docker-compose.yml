@@ -42,6 +42,22 @@ services:
     ports:
       - "3000:3000"
     environment:
+      - NEXT_PUBLIC_API_URL=http://api.tikvah.com
+    depends_on:
+      - app
+    networks:
+      - times-network
+    restart: unless-stopped
+
+  cms:
+    build:
+      context: ./cms
+      dockerfile: Dockerfile
+    container_name: times-cms
+    ports:
+      - "3030:3030"
+    environment:
+      - PORT=3030
       - NEXT_PUBLIC_API_URL=http://app:8080
     depends_on:
       - app
