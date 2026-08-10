@@ -1,4 +1,4 @@
-name: times-infra
+name: times
 
 services:
   postgres:
@@ -79,14 +79,20 @@ networks:
   times-network:
     name: times-network # Pins global network name across both configs
 
+
 volumes:
   postgres-data:
     name: times_postgres_data # Fixed global volume name
+
   minio_data:
     name: times_minio_data
+
   redis-data:
     name: times_redis_data
+
   rabbitmq-data:
     name: times_rabbitmq_data
+
   esdata:
     name: times_esdata
+
