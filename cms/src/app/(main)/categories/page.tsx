@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Category } from "@/app/types/types";
+import { Category } from "@/app/types/category";
 import { createCategory, deleteCategory, getCategories, updateCategory } from "@/app/lib/api";
 
 interface CategoryFormData {
@@ -12,7 +12,7 @@ interface CategoryFormData {
 export default function Categories() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<CategoryFormData>({ name: "", slug: "" });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -37,7 +37,7 @@ export default function Categories() {
     setForm({ name: category.name, slug: category.slug });
   };
 
-  const handleUpdate = async (id: number) => {
+  const handleUpdate = async (id: string) => {
     try {
       await updateCategory(id, form);
       const updated = categories.map((cat) =>
@@ -52,7 +52,7 @@ export default function Categories() {
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     try {
       await deleteCategory(id);
       setCategories(categories.filter((cat) => cat.id !== id));

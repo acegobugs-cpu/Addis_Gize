@@ -34,7 +34,7 @@ import (
 func main() {
 	ctx := context.Background()
 	// Load configuration
-	cfg, err := config.Load("configs/config.docker.yaml")
+	cfg, err := config.Load("configs/config.yaml")
 	if err != nil {
 		fmt.Printf("Failed to load config: %v\n", err)
 		os.Exit(1)
@@ -104,7 +104,7 @@ func main() {
 	//Initialize ElasticSearch
 	es, err := search.NewElasticSearch(cfg.ElasticSearch.Addresses) // Pass ES config host URLs!
 	if err != nil {
-		logger.Fatal("Failed to initialize Elastic Search", zap.Error(err)) // Stop app if search fails to start
+		logger.Warn("Failed to initialize Elastic Search", zap.Error(err)) // Stop app if search fails to start
 	}
 
 	// Initialize services

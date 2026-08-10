@@ -3,14 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Select from "react-select";
+
 import { ArrowLeftIcon, TrashIcon } from "@heroicons/react/24/outline";
 
 import { deleteLocale, getCategories, updateArticle, getArticleById } from "@/app/lib/api";
 import { Article, ArticleTranslation } from "@/app/types/article";
 import MediaBlock from "@/app/(main)/components/mediaBlock";
 import TextEditor from "@/app/(main)/components/editor/textEditor";
-import { Struct } from "next/dist/compiled/superstruct";
 import { Category } from "@/app/types/category";
+import { Media } from "@/app/types/media";
 
 
 
@@ -37,7 +38,7 @@ export default function EditArticlePage() {
     media: {
       mediaType: "image",
       url: "",
-    },
+    } as Media,
     translations: {} as Record<string, Partial<ArticleTranslation>>,
   });
 
@@ -55,20 +56,22 @@ export default function EditArticlePage() {
         }
 
         // Fetch target article (uses API function with mock fallback)
-        let articleData: Article;
         try {
           const apiRes = await getArticleById(articleId);
-          articleData = apiRes.data;
+          if (apiRes.data){
+            const articleData = apiRes.data;
+            setArticle(articleData);
+          } else {
+            throw new Error("Article data not found in API response.");
+          }
         } catch {
-          console.warn("API fetch failed, utilizing mock fallback data.");
-          articleData = (await getArticleById(articleId)).data;
+          console.warn("API fetch failed.");
+          // toast.error("Failed to fetch article from API..");
         }
-
-        setArticle(articleData);
 
         // Populate Form State
         const initialTranslations: Record<string, Partial<ArticleTranslation>> = {};
-        articleData.translations?.forEach((t) => {
+        article?.translations?.forEach((t) => {
           if (t.locale) {
             initialTranslations[t.locale] = {
               id: t.id,
@@ -81,13 +84,13 @@ export default function EditArticlePage() {
           }
         });
 
-        const defaultLocale = articleData.translations?.[0]?.locale || "om";
+        const defaultLocale = article?.translations?.[0]?.locale || "om";
         setSelectedLocale(defaultLocale);
 
         setFormData({
-          tag: articleData.tag || "primary",
-          category_ids: articleData.categories?.map((c) => c.id) || [],
-          media: articleData.media || { mediaType: "image", url: "" },
+          tag: article?.tag || "primary",
+          category_ids: article?.categories?.map((c) => c.id) || [],
+          media: article?.media || { mediaType: "image", url: "" },
           translations: initialTranslations,
         });
 
@@ -128,7 +131,7 @@ export default function EditArticlePage() {
     updateTranslation(selectedLocale, { title, slug });
   };
 
-  const handleDeleteTranslation = async (id?: number) => {
+  const handleDeleteTranslation = async (id?: string) => {
     if (!id) return;
     if (!confirm("Are you sure you want to delete this translation locale?")) return;
 

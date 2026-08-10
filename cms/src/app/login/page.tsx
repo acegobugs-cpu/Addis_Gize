@@ -4,14 +4,13 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../components/AuthContext";
 import { Eye, EyeOff } from "lucide-react";
-import { apiClient } from "../lib/api";
 
 export default function Login() {
   const [form, setForm] = useState({ email_or_username: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const { setUser, isAuthenticated, refreshUser, authFetch } = useAuth();
+  const { setUser, isAuthenticated, refreshUser} = useAuth();
   const router = useRouter();
 
   // Redirect if already authenticated
@@ -27,7 +26,7 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      const response = await authFetch("/api/proxy/auth/login", {
+      const response = await fetch("/api/proxy/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

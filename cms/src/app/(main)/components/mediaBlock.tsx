@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Media, MediaItemRes } from "@/app/types/types";
+import { Media, MediaItemRes } from "@/app/types/media";
 import { confirmSave, getMedia } from "@/app/lib/api";
 import { putMedia } from "@/app/components/utils/putMedia";
 
@@ -116,7 +116,7 @@ function SelectMedia({
       try {
         const mediaFiles = await getMedia();
         if (isMounted) {
-          setUploadedFiles(mediaFiles?.files || []);
+          setUploadedFiles(mediaFiles?.data || []);
         }
       } catch (error) {
         console.error("Failed to fetch uploaded files:", error);
@@ -159,7 +159,7 @@ function SelectMedia({
                   key={fileKey}
                   className="border border-gray-300 rounded-lg p-2 cursor-pointer hover:border-blue-500 hover:shadow-md transition-all group"
                   onClick={() => {
-                    onChange({ ...data, url: file.url, source: "local" });
+                    onChange({ ...data, url: file.url });
                     setShowModal(false);
                   }}
                 >

@@ -1,7 +1,7 @@
 'use client';
 
 import { deleteEmails, getInvites, invite } from "@/app/lib/api";
-import { Invite } from "@/app/types/types";
+import { Invite } from "@/app/types/user";
 import { useEffect, useState } from "react";
 
 const Roles = [
@@ -30,7 +30,7 @@ export default function EmailList() {
   const fetchEmails = async () => {
     try {
       const invitesData = await getInvites();
-      setInvites(invitesData.data);
+      setInvites(invitesData?.data || []);
     } catch {
       setError("Failed to fetch emails");
     }
@@ -70,7 +70,7 @@ export default function EmailList() {
     try {
       // Sending payload matching your backend expectations
       const res = await invite(formData);
-      setSlug(res.id);
+      setSlug(res?.data?.id || "");
       setSuccess("Email authorized successfully.");
       
       // Reset form fields completely

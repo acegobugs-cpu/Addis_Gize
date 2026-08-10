@@ -2,6 +2,7 @@
 
 import { Article, ArticleTranslation, ArticleUpdate } from "../types/article";
 import { Category } from "../types/category";
+import { MediaItemRes } from "../types/media";
 import { AuthResponse, Invite, RegisterData, User } from "../types/user";
 // 1. Import your advanced BackendClient instance 
 import { client as backend } from "./client"; // Adjust path to your BackendClient file
@@ -72,7 +73,7 @@ export async function invite(data: {
 
 export async function getInvites() {
   const res = await backend.get("/users/invites");
-  return handleResponse<{ success: boolean; statusCode: number; data: Invite[] }>(res);
+  return handleResponse<Invite[]>(res);
 }
 
 export async function deleteEmails(id: string) {
@@ -89,12 +90,12 @@ export async function getUsers() {
   return handleResponse<User[]>(res);
 }
 
-export async function deleteUser(id: number) {
+export async function deleteUser(id: string) {
   const res = await backend.delete(`/users/${id}`);
   return handleResponse<any>(res);
 }
 
-export async function updateUser(id: number, data: Partial<User>) {
+export async function updateUser(id: string, data: Partial<User>) {
   const res = await backend.put(`/users/${id}`, data);
   return handleResponse<User>(res);
 }
@@ -105,18 +106,19 @@ export async function updateUser(id: number, data: Partial<User>) {
 
 export async function getArticles(lan:string) {
   const res = await backend.get(`/articles?lan=${lan}`);
-  return handleResponse<AppResponse<Article[]>>(res);
+  return handleResponse<Article[]>(res);
 }
 
 export async function getArticleById(id: string) {
   const res = await backend.get(`/articles/${id}`);
-  return handleResponse<{data:Article}>(res);
+  return handleResponse<Article>(res);
 }
 
 export async function getArticleBySlug(slug: string) {
   const res = await backend.get(`/articles/slug/${slug}`);
   return handleResponse<Article>(res);
 }
+
 
 export async function createArticle(data: Partial<Article>) {
   const res = await backend.post("/articles", data);
@@ -186,12 +188,12 @@ export async function createCategory(data: Partial<Category>) {
   return handleResponse<Category>(res);
 }
 
-export async function updateCategory(id: number, data: Partial<Category>) {
+export async function updateCategory(id: string, data: Partial<Category>) {
   const res = await backend.put(`/categories/${id}`, data);
   return handleResponse<Category>(res);
 }
 
-export async function deleteCategory(id: number) {
+export async function deleteCategory(id: string) {
   const res = await backend.delete(`/categories/${id}`);
   return handleResponse<any>(res);
 }
@@ -202,7 +204,7 @@ export async function deleteCategory(id: number) {
 
 export async function getMedia() {
   const res = await backend.get("/uploads");
-  return handleResponse<{files:any[]}>(res);
+  return handleResponse<MediaItemRes[]>(res);
 }
 
 export async function delMedia(filename: string) {

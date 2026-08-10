@@ -1,7 +1,7 @@
 'use client';
 
 import { getMedia, uploadFile } from "@/app/lib/api";
-import { MediaItemRes } from "@/app/types/types";
+import { MediaItemRes } from "@/app/types/media";
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 
@@ -54,7 +54,7 @@ export function ImageModal({ editor, onClose }: BaseModalProps) {
     const fetchUploadedFiles = async () => {
       try {
         const mediaFiles = await getMedia();
-        setMedia(mediaFiles.files || []);
+        setMedia(mediaFiles.data || []);
       } catch (error) {
         console.error("Failed to fetch uploaded files:", error);
         setMedia([]);
@@ -180,7 +180,7 @@ export function VideoModal({ editor, onClose }: BaseModalProps) {
     const fetchUploadedFiles = async () => {
       try {
         const mediaFiles = await getMedia();
-        setMedia(mediaFiles.files || []);
+        setMedia(mediaFiles.data || []);
       } catch (error) {
         console.error("Failed to fetch uploaded files:", error);
         setMedia([]);

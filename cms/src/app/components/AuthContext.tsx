@@ -8,8 +8,7 @@ import React, {
   useCallback,
 } from "react";
 import { useRouter } from "next/navigation";
-import { User } from "../types/types";
-import { fetchWithAuth } from "../lib/fetchWithAuth";
+import { User } from "../types/user";
 
 // -----------------
 // Auth Context Types
@@ -21,7 +20,6 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   refreshUser: () => Promise<void>;
-  authFetch: (input: RequestInfo, init?: RequestInit) => Promise<Response>;
 }
 
 // -----------------
@@ -85,31 +83,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [router]);
 
-  // Intercepting Fetch Wrapper
-  const authFetch = useCallback(
-    async (input: RequestInfo, init?: RequestInit): Promise<Response> => {
-      // Setup base fetch configurations
-      const currentInit = {
-        ...init,
-        credentials: init?.credentials || "include", // Guarantee cookies pass through silently
-      };
+  // // Intercepting Fetch Wrapper
+  // const authFetch = useCallback(
+  //   async (input: RequestInfo, init?: RequestInit): Promise<Response> => {
+  //     // Setup base fetch configurations
+  //     const currentInit = {
+  //       ...init,
+  //       credentials: init?.credentials || "include", // Guarantee cookies pass through silently
+  //     };
 
-      // Execute request through your token auto-refresh lifecycle framework
-      const response = await fetchWithAuth(input, {
-        ...currentInit,
-        updateUser: refreshUser,
-      });
+  //     // Execute request through your token auto-refresh lifecycle framework
+  //     const response = await fetchWithAuth(input, {
+  //       ...currentInit,
+  //       updateUser: refreshUser,
+  //     });
 
-      // Edge case fallback handling: If the server returns a 403 Forbidden because 
-      // a CSRF session expired out, silently request a fresh pair and retry once.
-      if (response.status === 403) {
-        return fetchWithAuth(input, { ...currentInit, updateUser: refreshUser });
-      }
+  //     // Edge case fallback handling: If the server returns a 403 Forbidden because 
+  //     // a CSRF session expired out, silently request a fresh pair and retry once.
+  //     if (response.status === 403) {
+  //       return fetchWithAuth(input, { ...currentInit, updateUser: refreshUser });
+  //     }
 
-      return response;
-    },
-    [refreshUser],
-  );
+  //     return response;
+  //   },
+  //   [refreshUser],
+  // );
 
   const value: AuthContextType = {
     user,
@@ -118,7 +116,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: !!user,
     isLoading,
     refreshUser,
-    authFetch,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -3,17 +3,13 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/components/AuthContext";
-import { User } from "@/app/types/types";
+import { User } from "@/app/types/user";
 import { deleteUser, getUsers, updateUser } from "@/app/lib/api";
 
 interface UpdateFormData {
-  fname: string;
-  mname: string;
-  lname: string;
   uname: string;
   email: string;
   password: string;
-  is_superuser: boolean;
 }
 
 export default function AuthorizeEmail() {
@@ -58,7 +54,7 @@ function UserList({ onEditUser }: UserListProps) {
   const fetchUsers = async () => {
     try {
       const usersData = await getUsers();
-      setUsers(usersData);
+      setUsers(usersData?.data || []);
     } catch {
       setError("Failed to fetch users");
     }
@@ -68,7 +64,7 @@ function UserList({ onEditUser }: UserListProps) {
     fetchUsers();
   }, []);
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this user?")) {
       try {
         await deleteUser(id);
@@ -101,10 +97,8 @@ function UserList({ onEditUser }: UserListProps) {
           key={u.id}
           className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
         >
-          <td className="p-3 text-gray-800">{`${u.name}`}</td>
           <td className="p-3 text-gray-800">{u.username || "N/A"}</td>
           <td className="p-3 text-gray-800">{u.email}</td>
-          <td className="p-3">{u.is_superuser ? "✅" : "❌"}</td>
           <td className="p-3">
             <div className="flex gap-2">
               {currentUser?.id !== u.id && (
@@ -150,13 +144,9 @@ interface UpdateFormProps {
 
 function UpdateForm({ user, onCancel, onSaved }: UpdateFormProps) {
   const [form, setForm] = useState<UpdateFormData>({
-    fname: user.name.split(" ")[0] || "",
-    mname: user.name.split(" ")[1] || "",
-    lname: user.name.split(" ")[2] || "",
     uname: user.username || "",
     email: user.email,
     password: "",
-    is_superuser: user.is_superuser || false,
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -213,14 +203,6 @@ function UpdateForm({ user, onCancel, onSaved }: UpdateFormProps) {
         />
       </div>
       <label className="flex items-center">
-        <input
-          type="checkbox"
-          name="is_superuser"
-          checked={form.is_superuser}
-          onChange={handleChange}
-          className="mr-2"
-        />
-        Is Superuser
       </label>
       <div className="flex gap-2 justify-end pt-4">
         <button

@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import { Article } from "@/app/types/article";
 import { useAuth } from "@/app/components/AuthContext";
-import TextEditor from "@/app/(main)/components/editor/textEditor";
+import TextEditor, { TextEditorRef } from "@/app/(main)/components/editor/textEditor";
 import { addLocale, getArticleLocales } from "@/app/lib/api";
 import { getMissingLocales, LOCALE_LABELS, Locale } from "@/app/types/locale";
 
@@ -24,6 +24,8 @@ export default function AddLocalePage({ params }: PageProps) {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const editorRef = useRef<TextEditorRef>(null);
 
   const [formData, setFormData] = useState({
     locale: "" as Locale | "",
@@ -231,7 +233,7 @@ export default function AddLocalePage({ params }: PageProps) {
             </label>
             <div className="border border-gray-200 rounded-xl">
               <TextEditor
-                content={formData.content}
+                ref={editorRef}
                 onChange={(json) => setFormData({ ...formData, content: json })}
               />
             </div>

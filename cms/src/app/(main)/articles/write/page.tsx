@@ -24,7 +24,7 @@ export default function ArticleForm() {
       source: "external" as const,
       url: "",
     } as Media,
-    category_ids: [],
+    category_ids: [] as string[],
   });
 
   const [bodyContent, setBodyContent] = useState<any>(null);

@@ -2,7 +2,7 @@
 
 import { putMedia } from "@/app/components/utils/putMedia";
 import { confirmSave, delMedia, getMedia, uploadFile } from "@/app/lib/api";
-import { MediaItemRes } from "@/app/types/types";
+import { MediaItemRes } from "@/app/types/media";
 import { useState, useEffect } from "react";
 
 export default function Media() {
@@ -27,7 +27,7 @@ function UploadsEditor() {
       try {
         const response = await getMedia(); // This should return {files: string[]}
 
-        setUploadedFiles(response.files.map((file) => file));
+        setUploadedFiles(response?.data || []); // Update state with the fetched files
       } catch (error) {
         console.error("Error fetching media:", error);
       }
@@ -52,7 +52,7 @@ function UploadsEditor() {
 
     // 3. Refresh files list (or append the new file with its URL)
     const response = await getMedia();
-    setUploadedFiles(response.files.map((file) => file));
+    setUploadedFiles(response?.data || []);
 
   } catch (err) {
     alert("Upload failed: " + (err as Error).message);

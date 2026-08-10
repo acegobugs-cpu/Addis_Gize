@@ -1,4 +1,4 @@
-import { Media } from "@/app/types/types";
+import { Media } from "@/app/types/media";
 
 interface MediaRendererProps {
   media: Media | null;

@@ -13,7 +13,7 @@ export interface RegisterData {
 }
 
 export interface User {
-  id: number;
+  id: string;
   email: string;
   username: string;
 }

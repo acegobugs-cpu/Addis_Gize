@@ -1,22 +1,10 @@
 "use client";
-
-import dynamic from "next/dynamic";
-import { useState, useEffect, useRef, useCallback } from "react";
-import Select from "react-select";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/app/components/AuthContext";
-import MediaBlock from "../../components/mediaBlock";
 import MediaRenderer from "../../components/mediaRenderer";
-import {
-  Article,
-  Category,
-  ArticleTranslation,
-  Media,
-  ArticleUpdate,
-} from "@/app/types/types";
+import {Article, ArticleTranslation} from "@/app/types/article";
 import Link from "next/link";
-import { addLocale, deleteArticle, deleteLocale, getArticles, getCategories, updateArticle } from "@/app/lib/api";
-
-import TextEditor, { TextEditorRef } from "../../components/editor/textEditor";
+import {  deleteArticle, getArticles } from "@/app/lib/api";
 
 import {
   EllipsisVerticalIcon,
@@ -26,6 +14,7 @@ import {
   GlobeAltIcon,
 } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
+import { Category } from "@/app/types/category";
 
 export default function Articles() {
   const router = useRouter();
@@ -152,7 +141,7 @@ export default function Articles() {
         <div className="grid md:grid-cols-3 grid-cols-1 gap-6">
           {articles.map((article) => {
             // Find locale match for current selected language
-            const localeData = article.translations?.find((tr) => tr.locale === lan);
+            const localeData = article.translations?.find((tr:ArticleTranslation) => tr.locale === lan);
 
             return (
               <div
@@ -196,7 +185,7 @@ export default function Articles() {
                 <div className="p-5 flex-1 flex flex-col justify-between">
                   <div className="space-y-2">
                     <p className="text-xs font-medium text-indigo-600">
-                      {article.categories?.map((cat) => cat.name).join(", ") || "General"}
+                      {article.categories?.map((cat:Category) => cat.name).join(", ") || "General"}
                     </p>
 
                     <h2 className="text-lg font-serif font-bold text-gray-900 line-clamp-2 leading-snug">
