@@ -3,15 +3,15 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useParams, notFound } from 'next/navigation'; 
 import i18n from '../../i18n'; // make sure this path is correct
-import { isValidLocale } from '@/types/locale';
+import { isValidLocale, Locale } from '@/types/locale';
 
-const LocaleContext = createContext<string | undefined>(undefined);
+const LocaleContext = createContext<Locale | undefined>(undefined);
 export const useLocale = () => useContext(LocaleContext);
 
 
 export default function TranslationProvider({ children }:{children: React.ReactNode}) {
   const [isLoaded, setIsLoaded] = useState(false);
-  const { locale } = useParams<{ locale: string }>();
+  const { locale } = useParams<{ locale: Locale }>();
 
   useEffect(() => {
     if (!isValidLocale(locale)) {

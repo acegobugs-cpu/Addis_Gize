@@ -20,7 +20,7 @@ export default function Footer() {
       <div className="h-1 w-full bg-gradient-to-r from-east via-west to-east" />
 
       <div className="max-w-7xl mx-auto px-6 py-12">
-        <div className="grid grid-[#121212] grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 mb-12">
           
           {/* Col 1: Brand & About */}
           <div className="lg:col-span-2 space-y-4">
@@ -28,7 +28,7 @@ export default function Footer() {
               TIKVAH
             </h2>
             <p className="text-muted text-sm leading-relaxed max-w-sm">
-              Delivering accurate, timely news and in-depth reporting from around the globe. Stay informed with our dedicated coverage across world affairs, tech, culture, and sports.
+              {t('footer_description')}
             </p>
             {/* Social Links featuring West Green branding */}
             <div className="flex items-center space-x-3 pt-2">
@@ -83,37 +83,37 @@ export default function Footer() {
           {/* Col 2: Categories */}
           <div>
             <h3 className="text-sm font-semibold text-ink uppercase tracking-wider mb-4 border-l-2 border-west pl-2">
-              News Desk
+              {t('news_desk')}
             </h3>
             <ul className="space-y-2.5 text-sm text-muted">
               <li>
                 <Link href="/section/politics" className="hover:text-west transition-colors">
-                  Politics
+                  {t('politics')}
                 </Link>
               </li>
               <li>
                 <Link href="/section/business" className="hover:text-west transition-colors">
-                  Business & Markets
+                  {t('business_markets')}
                 </Link>
               </li>
               <li>
                 <Link href="/section/tech" className="hover:text-west transition-colors">
-                  Technology
+                  {t('technology')}
                 </Link>
               </li>
               <li>
                 <Link href="/section/science" className="hover:text-west transition-colors">
-                  Science & Climate
+                  {t('science_climate')}
                 </Link>
               </li>
               <li>
                 <Link href="/section/culture" className="hover:text-west transition-colors">
-                  Arts & Culture
+                  {t('arts_culture')}
                 </Link>
               </li>
               <li>
                 <Link href="/section/sports" className="hover:text-west transition-colors">
-                  Sports
+                  {t('sports')}
                 </Link>
               </li>
             </ul>
@@ -122,7 +122,7 @@ export default function Footer() {
           {/* Col 3: Company & Information */}
           <div>
             <h3 className="text-sm font-semibold text-ink uppercase tracking-wider mb-4 border-l-2 border-west pl-2">
-              Company
+              {t('company')}
             </h3>
             <ul className="space-y-2.5 text-sm text-muted">
               <li>
@@ -137,17 +137,20 @@ export default function Footer() {
               </li>
               <li>
                 <Link href="/careers" className="hover:text-west transition-colors">
-                  Careers <span className="text-[10px] bg-west-light text-west font-bold px-1.5 py-0.5 rounded-full ml-1">We're hiring</span>
+                  {t('careers')}{' '}
+                  <span className="text-[10px] bg-west-light text-west font-bold px-1.5 py-0.5 rounded-full ml-1">
+                    {t('we_are_hiring')}
+                  </span>
                 </Link>
               </li>
               <li>
                 <Link href="/press" className="hover:text-west transition-colors">
-                  Press Room
+                  {t('press_room')}
                 </Link>
               </li>
               <li>
                 <Link href="/ethics" className="hover:text-west transition-colors">
-                  Editorial Standards
+                  {t('editorial_standards')}
                 </Link>
               </li>
             </ul>
@@ -156,16 +159,16 @@ export default function Footer() {
           {/* Col 4: Newsletter Subscription */}
           <div>
             <h3 className="text-sm font-semibold text-ink uppercase tracking-wider mb-4 border-l-2 border-west pl-2">
-              Stay Updated
+              {t('stay_updated')}
             </h3>
             <p className="text-muted text-xs mb-3">
-              Get top news alerts delivered to your inbox every morning.
+              {t('newsletter_tagline')}
             </p>
             <form onSubmit={(e) => e.preventDefault()} className="space-y-2">
               <div className="relative">
                 <input
                   type="email"
-                  placeholder="Enter your email"
+                  placeholder={t('enter_email')}
                   className="w-full text-xs px-3 py-2 bg-canvas border border-border rounded-md text-ink placeholder-muted focus:outline-none focus:ring-1 focus:ring-west focus:border-west"
                   required
                 />
@@ -175,7 +178,7 @@ export default function Footer() {
                 className="w-full py-2 px-3 bg-west hover:bg-west-hover text-canvas font-medium text-xs rounded-md transition-colors flex items-center justify-center gap-1.5"
               >
                 <FaEnvelope size={12} />
-                Subscribe Now
+                {t('subscribe_now')}
               </button>
             </form>
           </div>
@@ -194,10 +197,10 @@ export default function Footer() {
               {t('terms')}
             </Link>
             <Link href="/cookies" className="hover:text-west transition-colors">
-              Cookie Policy
+              {t('cookie_policy')}
             </Link>
             <Link href="/sitemap" className="hover:text-west transition-colors">
-              Sitemap
+              {t('sitemap')}
             </Link>
           </div>
         </div>

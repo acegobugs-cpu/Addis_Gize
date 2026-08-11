@@ -17,7 +17,19 @@ import { useLocale } from './TranslationProvider';
 import { Locale, SUPPORTED_LOCALES } from '@/types/locale';
 
 // 1. Define Supported Languages and Component Interfaces
-const NAME = "TIKVAH ETHIOPIA";
+const NAME = ({lan}: {lan: Locale}) =>{
+  const { t } = useTranslation();
+  return (
+  <h1 className="md:text-3xl text-xl font-serif font-bold tracking-widest">
+    <a 
+      href={`/${lan}`} 
+      className="bg-gradient-to-r from-east via-east-hover to-west bg-clip-text text-transparent hover:opacity-90 transition-opacity"
+    >
+      {t('tikvah_ethiopia')}
+    </a>
+  </h1>
+)
+}
 
 export interface Section {
   id: string | number;
@@ -200,15 +212,15 @@ export default function Header({ sections }: HeaderProps) {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [lastScrollY, searchValue]);
 
+  if(!lan) return null;
+
   return (
     <>
       <header className="w-full border-b-2 border-east bg-canvas text-ink">
         {/* Desktop nav */}
         <div className="hidden md:block max-w-7xl mx-auto p-4">
           <div className="relative flex justify-between items-center">
-            <h1 className="md:text-3xl text-xl font-serif font-bold tracking-widest text-east hover:text-east-hover transition-colors">
-              <a href={`/${lan}`}>{NAME}</a>
-            </h1>
+            <NAME lan={lan} />
             <div className="hidden md:block">
               <LanguageSwitcher />
             </div>
@@ -253,9 +265,7 @@ export default function Header({ sections }: HeaderProps) {
         {/* Mobile nav */}
         <div className="md:hidden max-w-7xl mx-auto p-4">
           <div className="relative flex justify-between items-center">
-            <h1 className="md:text-3xl text-xl font-serif font-bold tracking-widest text-east hover:text-east-hover transition-colors">
-              <a href={`/${lan}`}>{NAME}</a>
-            </h1>
+            <NAME lan={lan} />
             <button className="text-ink p-1 rounded hover:bg-surface" onClick={() => setIsOpen(!isOpen)}>
               {isOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
@@ -296,9 +306,7 @@ export default function Header({ sections }: HeaderProps) {
             isScrolledDown ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none'
           }`}
         >
-          <h1 className="text-xl font-serif font-bold tracking-widest text-east">
-            <a href={`/${lan}`}>{NAME}</a>
-          </h1>
+          <NAME lan={lan} />
           <div className="relative flex mx-auto max-w-lg w-full">
             {/* Left button */}
             <button
