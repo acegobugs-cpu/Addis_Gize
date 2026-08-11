@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import { Menu, X } from 'lucide-react';
 import {
   ChevronLeftIcon,
@@ -14,9 +14,9 @@ import { MainSearchBar, HeaderSearchBar } from './SearchBar';
 import { useTranslation } from 'react-i18next';
 import { usePathname, useRouter } from 'next/navigation';
 import { useLocale } from './TranslationProvider';
+import { Locale, SUPPORTED_LOCALES } from '@/types/locale';
 
 // 1. Define Supported Languages and Component Interfaces
-type SupportedLanguage = 'om' | 'am' | 'en';
 const NAME = "TIKVAH ETHIOPIA";
 
 export interface Section {
@@ -29,21 +29,19 @@ export interface HeaderProps {
   sections: Section[];
 }
 
-function LanguageSwitcher() {
+export function LanguageSwitcher() {
   const { i18n } = useTranslation();
-  const currentLocale = useLocale() as SupportedLanguage;
+  const currentLocale = useLocale() as Locale;
   const router = useRouter();
   const pathname = usePathname();
-  const [pendingLng, setPendingLng] = useState<SupportedLanguage | null>(null);
+  const [pendingLng, setPendingLng] = useState<Locale | null>(null);
 
-  const languages: SupportedLanguage[] = ['om', 'am', 'en'];
-
-  const handleChange = (lng: SupportedLanguage) => {
+  const handleChange = (lng: Locale) => {
     if (lng === currentLocale) return;
 
-    const segments = pathname.split('/');
+    const segments = pathname.split("/");
     segments[1] = lng;
-    const newPath = segments.join('/');
+    const newPath = segments.join("/");
 
     setPendingLng(lng);
     router.push(newPath);
@@ -59,45 +57,84 @@ function LanguageSwitcher() {
   if (!currentLocale) return null;
 
   return (
-    <div className="relative w-28 md:w-36 z-50">
-      <Listbox value={currentLocale} onChange={handleChange}>
-        <div className="relative">
-          <Listbox.Button className="relative w-full cursor-pointer rounded-lg bg-canvas py-2 pl-3 pr-10 text-left border border-border shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-east focus:border-transparent transition duration-200 text-ink">
-            <span className="block truncate font-medium">{currentLocale.toUpperCase()}</span>
-            <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-              <ChevronUpDownIcon className="h-4 w-4 text-muted" aria-hidden="true" />
-            </span>
-          </Listbox.Button>
-
-          <Listbox.Options className="absolute mt-1 w-full max-h-60 overflow-auto rounded-md bg-canvas py-1 text-sm shadow-lg border border-border focus:outline-none">
-            {languages.map((lng) => (
-              <Listbox.Option
-                key={lng}
-                value={lng}
-                className={({ active }) =>
-                  `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
-                    active ? 'bg-east-light text-east-dark font-medium' : 'text-ink'
-                  }`
-                }
+    <>
+      {/* Desktop & Tablet Horizontal List (md and larger) */}
+      <div className="hidden md:flex items-center text-sm text-ink font-medium">
+        {SUPPORTED_LOCALES.map((lng, index) => {
+          const isSelected = lng === currentLocale;
+          return (
+            <Fragment key={lng}>
+              {index > 0 && (
+                <span className="mx-2 text-muted/60 select-none">|</span>
+              )}
+              <button
+                type="button"
+                onClick={() => handleChange(lng)}
+                className={`uppercase transition-colors duration-150 ${
+                  isSelected
+                    ? "text-east font-bold underline underline-offset-4"
+                    : "text-muted hover:text-ink"
+                }`}
               >
-                {({ selected }) => (
-                  <>
-                    <span className={`block truncate ${selected ? 'font-semibold text-east' : 'font-normal'}`}>
-                      {lng.toUpperCase()}
-                    </span>
-                    {selected && (
-                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-east">
-                        <CheckIcon className="h-4 w-4" aria-hidden="true" />
+                {lng}
+              </button>
+            </Fragment>
+          );
+        })}
+      </div>
+
+      {/* Mobile Dropdown (hidden on md and larger) */}
+      <div className="relative w-28 md:hidden z-50">
+        <Listbox value={currentLocale} onChange={handleChange}>
+          <div className="relative">
+            <Listbox.Button className="relative w-full cursor-pointer rounded-lg bg-canvas py-2 pl-3 pr-10 text-left border border-border shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-east focus:border-transparent transition duration-200 text-ink">
+              <span className="block truncate font-medium">
+                {currentLocale.toUpperCase()}
+              </span>
+              <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                <ChevronUpDownIcon
+                  className="h-4 w-4 text-muted"
+                  aria-hidden="true"
+                />
+              </span>
+            </Listbox.Button>
+
+            <Listbox.Options className="absolute mt-1 w-full max-h-60 overflow-auto rounded-md bg-canvas py-1 text-sm shadow-lg border border-border focus:outline-none">
+              {SUPPORTED_LOCALES.map((lng) => (
+                <Listbox.Option
+                  key={lng}
+                  value={lng}
+                  className={({ active }) =>
+                    `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
+                      active
+                        ? "bg-east-light text-east-dark font-medium"
+                        : "text-ink"
+                    }`
+                  }
+                >
+                  {({ selected }) => (
+                    <>
+                      <span
+                        className={`block truncate ${
+                          selected ? "font-semibold text-east" : "font-normal"
+                        }`}
+                      >
+                        {lng.toUpperCase()}
                       </span>
-                    )}
-                  </>
-                )}
-              </Listbox.Option>
-            ))}
-          </Listbox.Options>
-        </div>
-      </Listbox>
-    </div>
+                      {selected && (
+                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-east">
+                          <CheckIcon className="h-4 w-4" aria-hidden="true" />
+                        </span>
+                      )}
+                    </>
+                  )}
+                </Listbox.Option>
+              ))}
+            </Listbox.Options>
+          </div>
+        </Listbox>
+      </div>
+    </>
   );
 }
 
@@ -166,7 +203,8 @@ export default function Header({ sections }: HeaderProps) {
   return (
     <>
       <header className="w-full border-b-2 border-east bg-canvas text-ink">
-        <div className="max-w-7xl mx-auto p-4">
+        {/* Desktop nav */}
+        <div className="hidden md:block max-w-7xl mx-auto p-4">
           <div className="relative flex justify-between items-center">
             <h1 className="md:text-3xl text-xl font-serif font-bold tracking-widest text-east hover:text-east-hover transition-colors">
               <a href={`/${lan}`}>{NAME}</a>
@@ -174,13 +212,10 @@ export default function Header({ sections }: HeaderProps) {
             <div className="hidden md:block">
               <LanguageSwitcher />
             </div>
-            <button className="md:hidden text-ink p-1 rounded hover:bg-surface" onClick={() => setIsOpen(!isOpen)}>
-              {isOpen ? <X size={24} /> : <Menu size={24} />}
-            </button>
           </div>
 
           {/* Desktop nav */}
-          <div className="relative mt-4 hidden md:flex mx-auto max-w-lg">
+          <div className="relative mt-4 flex mx-auto max-w-lg">
             {/* Left button */}
             <button
               onClick={() => scroll('left')}
@@ -215,11 +250,19 @@ export default function Header({ sections }: HeaderProps) {
             </button>
           </div>
         </div>
-
         {/* Mobile nav */}
+        <div className="md:hidden max-w-7xl mx-auto p-4">
+          <div className="relative flex justify-between items-center">
+            <h1 className="md:text-3xl text-xl font-serif font-bold tracking-widest text-east hover:text-east-hover transition-colors">
+              <a href={`/${lan}`}>{NAME}</a>
+            </h1>
+            <button className="text-ink p-1 rounded hover:bg-surface" onClick={() => setIsOpen(!isOpen)}>
+              {isOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
         <nav
           ref={sidePanelRef}
-          className={`md:hidden fixed top-0 right-0 h-screen w-64 bg-surface border-l border-border shadow-2xl z-50 transform transition-transform duration-300 flex flex-col ${
+          className={`fixed top-0 right-0 h-screen w-64 bg-surface border-l border-border shadow-2xl z-50 transform transition-transform duration-300 flex flex-col ${
             isOpen ? 'translate-x-0' : 'translate-x-full'
           }`}
         >
@@ -245,6 +288,7 @@ export default function Header({ sections }: HeaderProps) {
             ))}
           </div>
         </nav>
+        </div>
 
         {/* Scrolled fixed nav */}
         <nav

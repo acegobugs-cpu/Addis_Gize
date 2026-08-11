@@ -26,8 +26,9 @@ function UploadsEditor() {
     const fetchFiles = async () => {
       try {
         const response = await getMedia(); // This should return {files: string[]}
-
-        setUploadedFiles(response?.data || []); // Update state with the fetched files
+        if (response?.data) {
+          setUploadedFiles(response.data);
+        }
       } catch (error) {
         console.error("Error fetching media:", error);
       }

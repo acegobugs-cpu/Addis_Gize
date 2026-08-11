@@ -72,7 +72,7 @@ type GetPresignedURLResponse struct {
 	ExpiresAt  time.Time `json:"expires_at"`
 }
 
-func (s *MediaService) ListUploadedFiles(ctx context.Context, limit, offset int) (*MediaListRes, error) {
+func (s *MediaService) ListUploadedFiles(ctx context.Context, limit, offset int) (*[]entities.MediaItemRes, error) {
 	mediaItems, err := s.repo.ListAttached(ctx, limit, offset)
 	if err != nil {
 		return nil, err
@@ -95,7 +95,7 @@ func (s *MediaService) ListUploadedFiles(ctx context.Context, limit, offset int)
 	// 	}
 	// }
 
-	return &MediaListRes{Files: mediaItems}, nil
+	return &mediaItems, nil
 }
 
 func (s *MediaService) Download(ctx context.Context, filename string) (io.ReadCloser, string, error) {
@@ -253,8 +253,8 @@ func (s *MediaService) GetPresignedUploadURL(ctx context.Context, userID uuid.UU
 	}, nil
 }
 
-func (s *MediaService) ConfirmUploads(ctx context.Context, req StorageKeys) ([]uuid.UUID, error) {
-	var attachedIDs []uuid.UUID
+func (s *MediaService) ConfirmUploads(ctx context.Context, req StorageKeys) ([]entities.MediaItemRes, error) {
+	var attachedItems []entities.MediaItemRes
 
 	for _, key := range req.Keys {
 		// 1. Verify existence in MinIO / S3
@@ -272,8 +272,8 @@ func (s *MediaService) ConfirmUploads(ctx context.Context, req StorageKeys) ([]u
 			return nil, fmt.Errorf("failed to attach media for key %s: %w", key, err)
 		}
 
-		attachedIDs = append(attachedIDs, *id)
+		attachedItems = append(attachedItems, *id)
 	}
 
-	return attachedIDs, nil
+	return attachedItems, nil
 }

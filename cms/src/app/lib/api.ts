@@ -258,5 +258,5 @@ export async function getPresignedUrl(metadata: {
 
 export async function confirmSave(keys : string[]){
   const res = await backend.post("/uploads/confirm", undefined, {body: JSON.stringify({storageKeys: keys})})
-  return await res.json()
+  return handleResponse<MediaItemRes[]>(res);
 }

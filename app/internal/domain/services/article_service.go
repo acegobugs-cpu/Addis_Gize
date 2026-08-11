@@ -2,37 +2,45 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"time"
 
 	"app/internal/domain/entities"
 	"app/internal/domain/repositories"
+	"app/internal/infra/search"
 	"app/internal/pkg/errors"
 	"app/internal/pkg/logger"
+	"app/internal/workers"
 
 	"github.com/google/uuid"
 )
 
 // ArticleService handles article business logic
 type ArticleService struct {
-	articleRepo  *repositories.ArticleRepository
-	categoryRepo *repositories.CategoryRepository
+	articleRepo       *repositories.ArticleRepository
+	categoryRepo      *repositories.CategoryRepository
+	searchSvc         *search.ElasticSearch
+	translationWorker *workers.TranslationWorker
 }
 
 // NewArticleService creates a new article service
-func NewArticleService(articleRepo *repositories.ArticleRepository, categoryRepo *repositories.CategoryRepository) *ArticleService {
+func NewArticleService(articleRepo *repositories.ArticleRepository, categoryRepo *repositories.CategoryRepository, searchSvc *search.ElasticSearch, translationWorker *workers.TranslationWorker) *ArticleService {
 	return &ArticleService{
-		articleRepo:  articleRepo,
-		categoryRepo: categoryRepo,
+		articleRepo:       articleRepo,
+		categoryRepo:      categoryRepo,
+		searchSvc:         searchSvc,
+		translationWorker: translationWorker,
 	}
 }
 
 type AddLocaleReq struct {
-	ArticleID   *uuid.UUID     `json:"article_id"`
-	Locale      string         `json:"locale"`
-	Title       string         `json:"title"`
-	Slug        string         `json:"slug"`
-	Description string         `json:"description"`
-	Content     map[string]any `json:"content,omitempty"`
+	ArticleID   *uuid.UUID      `json:"article_id"`
+	Locale      string          `json:"locale"`
+	Title       string          `json:"title"`
+	Slug        string          `json:"slug"`
+	Description string          `json:"description"`
+	Content     json.RawMessage `json:"content,omitempty"`
 }
 
 // CreateArticle creates a new article
@@ -55,6 +63,26 @@ func (s *ArticleService) CreateArticle(ctx context.Context, article *entities.Ar
 		if err := s.articleRepo.AddCategory(ctx, article.ID, catID); err != nil {
 			return errors.ErrInternalServer.W("Failed to add category to article", "")
 		}
+	}
+
+	// 2. Index ORIGINAL article locale into Elasticsearch
+	for _, locale := range article.Translations {
+		plainContent := workers.ExtractTextFromTiptap(string(locale.Content))
+		_ = s.searchSvc.IndexArticle(ctx, search.ArticleDocument{
+			ID:          fmt.Sprintf("%s_%s", article.ID, locale.Locale),
+			ArticleID:   article.ID.String(),
+			Locale:      locale.Locale,
+			Title:       locale.Title,
+			Slug:        locale.Slug,
+			Description: locale.Description,
+			ContentText: plainContent,
+			CreatedAt:   time.Now().Format(time.RFC3339),
+		})
+	}
+
+	// 🚀 Trigger background translation for missing locales!
+	if s.translationWorker != nil {
+		s.translationWorker.Enqueue(article.ID)
 	}
 
 	return nil

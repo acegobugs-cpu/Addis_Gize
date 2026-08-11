@@ -41,11 +41,11 @@ type CreateArticleRequest struct {
 
 // ArticleLocaleRequest represents an article locale request
 type ArticleLocaleRequest struct {
-	Locale      string         `json:"locale"`
-	Title       string         `json:"title"`
-	Slug        string         `json:"slug"`
-	Description string         `json:"description"`
-	Content     map[string]any `json:"content,omitempty"`
+	Locale      string          `json:"locale"`
+	Title       string          `json:"title"`
+	Slug        string          `json:"slug"`
+	Description string          `json:"description"`
+	Content     json.RawMessage `json:"content,omitempty"`
 }
 
 // CreateArticle handles creating a new article

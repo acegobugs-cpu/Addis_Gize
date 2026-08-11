@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/sashabaranov/go-openai"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 
@@ -107,10 +108,22 @@ func main() {
 		logger.Warn("Failed to initialize Elastic Search", zap.Error(err)) // Stop app if search fails to start
 	}
 
+	geminiAPIKey := cfg.AI.OpenAI_API_Key // Or get it from cfg.GeminiAPIKey
+	if geminiAPIKey == "" {
+		log.Fatal("GEMINI_API_KEY environment variable is missing")
+	}
+
+	clientConfig := openai.DefaultConfig(geminiAPIKey)
+	clientConfig.BaseURL = "https://api.groq.com/openai/v1"
+
+	aiClient := openai.NewClientWithConfig(clientConfig)
+
+	translationWorker := workers.NewTranslationWorker(db.Pool(), aiClient, es)
+
 	// Initialize services
 	userService := services.NewUserService(userRepo, invitesRepo, mail, cache, cfg)
 	authService := services.NewAuthService(userRepo, invitesRepo, cache, cfg)
-	articleService := services.NewArticleService(articleRepo, categoryRepo)
+	articleService := services.NewArticleService(articleRepo, categoryRepo, es, translationWorker)
 	categoryService := services.NewCategoryService(categoryRepo)
 	authEmailService := services.NewAuthorizedEmailService(authEmailRepo, userRepo)
 	mediaService := services.NewMediaService(mediaRepo, storageSvc, cfg.Storage.MaxFileSize, cfg.Storage.PublicURL)

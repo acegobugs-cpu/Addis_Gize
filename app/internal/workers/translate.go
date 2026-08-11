@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool" // Uses your pgxpool!
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -33,9 +33,10 @@ type AITranslationResponse struct {
 }
 
 type TranslationWorker struct {
-	pool      *pgxpool.Pool // Uses your existing pgxpool connection
+	pool      *pgxpool.Pool
 	aiClient  *openai.Client
 	searchSvc *search.ElasticSearch
+	jobChan   chan uuid.UUID
 }
 
 func NewTranslationWorker(pool *pgxpool.Pool, aiClient *openai.Client, search *search.ElasticSearch) *TranslationWorker {
@@ -43,9 +44,52 @@ func NewTranslationWorker(pool *pgxpool.Pool, aiClient *openai.Client, search *s
 		pool:      pool,
 		aiClient:  aiClient,
 		searchSvc: search,
+		jobChan:   make(chan uuid.UUID, 100),
 	}
 }
 
+// ---------------------------------------------------------
+// FEATURE 1: Background Async Queue (For Web Application)
+// ---------------------------------------------------------
+
+// Start launches worker goroutines that listen to the queue.
+func (w *TranslationWorker) Start(ctx context.Context, workerCount int) {
+	log.Printf("🚀 Starting %d background translation worker(s)...", workerCount)
+	for i := 1; i <= workerCount; i++ {
+		go func(workerID int) {
+			for {
+				select {
+				case <-ctx.Done():
+					log.Printf("[Worker %d] Stopping...", workerID)
+					return
+				case articleID := <-w.jobChan:
+					log.Printf("[Worker %d] Processing Article ID: %s", workerID, articleID)
+					jobCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+					if err := w.ProcessArticle(jobCtx, articleID); err != nil {
+						log.Printf("[Worker %d] Error on %s: %v", workerID, articleID, err)
+					}
+					cancel()
+				}
+			}
+		}(i)
+	}
+}
+
+// Enqueue adds an article ID to the processing queue.
+func (w *TranslationWorker) Enqueue(articleID uuid.UUID) {
+	select {
+	case w.jobChan <- articleID:
+		log.Printf("📥 Article %s enqueued for background translation", articleID)
+	default:
+		log.Printf("⚠️ Translation queue full! Skipping Article %s", articleID)
+	}
+}
+
+// ---------------------------------------------------------
+// FEATURE 2: Bulk Database Migration (For CLI Jobs)
+// ---------------------------------------------------------
+
+// Run scans the entire database for any articles missing translations.
 func (w *TranslationWorker) Run(ctx context.Context) error {
 	rows, err := w.pool.Query(ctx, "SELECT DISTINCT article_id FROM article_locale")
 	if err != nil {
@@ -71,6 +115,10 @@ func (w *TranslationWorker) Run(ctx context.Context) error {
 
 	return nil
 }
+
+// ---------------------------------------------------------
+// Core Processing Logic
+// ---------------------------------------------------------
 
 func (w *TranslationWorker) ProcessArticle(ctx context.Context, articleID uuid.UUID) error {
 	rows, err := w.pool.Query(ctx, `
@@ -118,7 +166,7 @@ func (w *TranslationWorker) ProcessArticle(ctx context.Context, articleID uuid.U
 
 		_, err = w.pool.Exec(ctx, `
 			INSERT INTO article_locale (id, article_id, locale, title, slug, description, content, is_ai_generated, editor_id)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, '8d64fb84-c7b6-42b4-89ce-e83ddaba8964')
+			VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, '0e6f099f-6156-482a-9526-8736c7348e6f')
 			ON CONFLICT (article_id, locale) DO NOTHING`,
 			uuid.New(), articleID, targetLang, translated.Title, slug, translated.Description, string(translated.Content),
 		)
@@ -130,7 +178,6 @@ func (w *TranslationWorker) ProcessArticle(ctx context.Context, articleID uuid.U
 
 			plainContent := ExtractTextFromTiptap(string(translated.Content))
 
-			// Sync to Elasticsearch
 			_ = w.searchSvc.IndexArticle(ctx, search.ArticleDocument{
 				ID:          fmt.Sprintf("%s_%s", articleID, targetLang),
 				ArticleID:   articleID.String(),
@@ -157,7 +204,6 @@ STRICT RULES FOR CONTENT JSON (Tiptap Schema):
 2. Do NOT change node types, keys, structures, media tags, videos, figures, or formatting rules.
 3. Translate ONLY text values inside "text": "..." fields.
 4. Output valid JSON matching the exact schema specified below.
-5. Use the same editor.
 
 Language Key:
 - 'am': Amharic
@@ -178,8 +224,8 @@ Description: %s
 Content JSON: %s
 `, source.Locale, targetLang, source.Title, source.Description, source.Content)
 
-	resp, err := w.aiClient.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
-		Model: "llama-3.3-70b-versatile", // or your target model
+	req := openai.ChatCompletionRequest{
+		Model: "llama-3.3-70b-versatile",
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role:    openai.ChatMessageRoleSystem,
@@ -187,13 +233,15 @@ Content JSON: %s
 			},
 			{
 				Role:    openai.ChatMessageRoleUser,
-				Content: prompt, // Ensure prompt contains the word 'JSON'
+				Content: prompt,
 			},
 		},
 		ResponseFormat: &openai.ChatCompletionResponseFormat{
 			Type: openai.ChatCompletionResponseFormatTypeJSONObject,
 		},
-	})
+	}
+
+	resp, err := w.translateWithRetry(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -206,13 +254,6 @@ Content JSON: %s
 	return &result, nil
 }
 
-func GenerateSlug(text string) string {
-	reg := regexp.MustCompile(`[^\w\s\p{L}]`)
-	cleaned := reg.ReplaceAllString(text, "")
-	words := strings.Fields(cleaned)
-	return strings.Join(words, "-")
-}
-
 func (w *TranslationWorker) translateWithRetry(ctx context.Context, req openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
 	maxRetries := 3
 	backoff := 2 * time.Second
@@ -223,20 +264,25 @@ func (w *TranslationWorker) translateWithRetry(ctx context.Context, req openai.C
 			return resp, nil
 		}
 
-		// Check if error is a rate limit (429)
 		if strings.Contains(err.Error(), "429") || strings.Contains(err.Error(), "Rate limit") {
 			time.Sleep(backoff)
-			backoff *= 2 // Exponential backoff (2s, 4s, 8s)
+			backoff *= 2
 			continue
 		}
 
 		return resp, err
 	}
-	return openai.ChatCompletionResponse{}, nil
+	return openai.ChatCompletionResponse{}, fmt.Errorf("exceeded max retries")
+}
+
+func GenerateSlug(text string) string {
+	reg := regexp.MustCompile(`[^\w\s\p{L}]`)
+	cleaned := reg.ReplaceAllString(text, "")
+	words := strings.Fields(cleaned)
+	return strings.Join(words, "-")
 }
 
 func ExtractTextFromTiptap(tiptapJSON string) string {
-	// Simple regex filter to extract all "text":"..." values from Tiptap schema
 	re := regexp.MustCompile(`"text"\s*:\s*"([^"]+)"`)
 	matches := re.FindAllStringSubmatch(tiptapJSON, -1)
 

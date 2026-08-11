@@ -18,16 +18,16 @@ func main() {
 	ctx := context.Background()
 
 	// 1. Load config & initialize database
-	cfg, err := config.Load("configs/config.docker.yaml")
+	cfg, err := config.Load("configs/config.yaml")
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	pg, err := database.NewPostgres(&cfg.Database)
+	db, err := database.NewPostgres(&cfg.Database)
 	if err != nil {
 		log.Fatalf("Database connection failed: %v", err)
 	}
-	defer pg.Close(ctx)
+	defer db.Close(ctx)
 
 	// 2. Configure OpenAI SDK to point to Gemini's free endpoint
 	geminiAPIKey := cfg.AI.OpenAI_API_Key // Or get it from cfg.GeminiAPIKey
@@ -46,7 +46,7 @@ func main() {
 	}
 
 	// 3. Initialize and run translation worker
-	worker := workers.NewTranslationWorker(pg.Pool(), aiClient, es)
+	worker := workers.NewTranslationWorker(db.Pool(), aiClient, es)
 
 	log.Println("🚀 Starting Translation Worker (using Gemini)...")
 	if err := worker.Run(ctx); err != nil {

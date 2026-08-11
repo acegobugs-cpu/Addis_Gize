@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS article_locale (
     slug VARCHAR(255) NOT NULL,
     description TEXT NOT NULL,
     content JSONB,
+    is_ai_generated BOOLEAN DEFAULT FALSE,
     published_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (locale, article_id)

@@ -8,8 +8,6 @@ import (
 	"app/internal/domain/entities"
 	"app/internal/infra/database"
 	"app/internal/pkg/logger"
-
-	"github.com/google/uuid"
 )
 
 type MediaRepository struct {
@@ -106,24 +104,31 @@ func (r *MediaRepository) CreatePending(ctx context.Context, media *entities.Med
 	return nil
 }
 
-func (r *MediaRepository) Attach(ctx context.Context, key string) (*uuid.UUID, error) {
+func (r *MediaRepository) Attach(ctx context.Context, key string) (*entities.MediaItemRes, error) {
 	query := `
 		UPDATE media 
 		SET 
 			status = 'attached',
 			updated_at = CURRENT_TIMESTAMP
 		WHERE storage_key = $1 AND status = 'pending'
-		RETURNING id
+		RETURNING id, filename, url, type, source, created_at
 	`
 
-	var id uuid.UUID
-	err := r.db.QueryRow(ctx, query, key).Scan(&id)
+	var mediaItem entities.MediaItemRes
+	err := r.db.QueryRow(ctx, query, key).Scan(
+		&mediaItem.ID,
+		&mediaItem.FileName,
+		&mediaItem.URL,
+		&mediaItem.Type,
+		&mediaItem.Source,
+		&mediaItem.CreatedAt,
+	)
 	if err != nil {
 		logger.LogError(ctx, err, "failed to mark media as attached")
 		return nil, fmt.Errorf("failed to attach media: %w", err)
 	}
 
-	return &id, nil
+	return &mediaItem, nil
 }
 
 // DeletePendingOlderThan deletes pending DB rows older than the cutoff time and returns their storage keys

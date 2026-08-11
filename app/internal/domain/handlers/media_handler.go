@@ -98,9 +98,7 @@ func (h *MediaHandler) ListUploadedFiles(w http.ResponseWriter, r *http.Request)
 	}
 
 	// 3. Return JSON response
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(res)
+	h.handler.RespondJSON(w, http.StatusOK, res)
 }
 
 func (h *MediaHandler) GetFile(w http.ResponseWriter, r *http.Request) {

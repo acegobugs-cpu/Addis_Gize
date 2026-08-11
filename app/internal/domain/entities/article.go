@@ -1,6 +1,7 @@
 package entities
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -35,20 +36,20 @@ func (a *Article) TableName() string {
 
 // ArticleLocale represents a localized version of an article
 type ArticleLocale struct {
-	ID          uuid.UUID      `json:"id"`
-	ArticleID   *uuid.UUID     `json:"article_id"`
-	EditorID    uuid.UUID      `json:"editor_id"`
-	Locale      string         `json:"locale"`
-	Title       string         `json:"title"`
-	Slug        string         `json:"slug"`
-	Description string         `json:"description"`
-	Content     map[string]any `json:"content,omitempty"`
-	PublishedAt time.Time      `json:"published_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
+	ID          uuid.UUID       `json:"id"`
+	ArticleID   *uuid.UUID      `json:"article_id"`
+	EditorID    uuid.UUID       `json:"editor_id"`
+	Locale      string          `json:"locale"`
+	Title       string          `json:"title"`
+	Slug        string          `json:"slug"`
+	Description string          `json:"description"`
+	Content     json.RawMessage `json:"content,omitempty"`
+	PublishedAt time.Time       `json:"published_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
 }
 
 // NewArticleLocale creates a new article locale entity
-func NewArticleLocale(articleID *uuid.UUID, editorID uuid.UUID, locale, slug, title, description string, content map[string]any) *ArticleLocale {
+func NewArticleLocale(articleID *uuid.UUID, editorID uuid.UUID, locale, slug, title, description string, content json.RawMessage) *ArticleLocale {
 	now := time.Now()
 	return &ArticleLocale{
 		ArticleID:   articleID,
@@ -69,17 +70,17 @@ func (al *ArticleLocale) TableName() string {
 }
 
 type Story struct {
-	ID          uuid.UUID      `json:"id"`
-	ArticleID   *uuid.UUID     `json:"article_id"`
-	Tag         string         `json:"tag"`
-	Media       map[string]any `json:"media,omitempty"`
-	Categories  []Category     `json:"categories,omitempty"`
-	EditorID    uuid.UUID      `json:"editor_id"`
-	Locale      string         `json:"locale"`
-	Title       string         `json:"title"`
-	Slug        string         `json:"slug"`
-	Description string         `json:"description"`
-	Content     map[string]any `json:"content,omitempty"`
+	ID          uuid.UUID       `json:"id"`
+	ArticleID   *uuid.UUID      `json:"article_id"`
+	Tag         string          `json:"tag"`
+	Media       map[string]any  `json:"media,omitempty"`
+	Categories  []Category      `json:"categories,omitempty"`
+	EditorID    uuid.UUID       `json:"editor_id"`
+	Locale      string          `json:"locale"`
+	Title       string          `json:"title"`
+	Slug        string          `json:"slug"`
+	Description string          `json:"description"`
+	Content     json.RawMessage `json:"content,omitempty"`
 
 	PublishedAt time.Time `json:"published_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
@@ -93,13 +94,13 @@ type CategoryArticle struct {
 }
 
 type TranslationPatch struct {
-	ID          *uuid.UUID     `json:"id,omitempty"`
-	EditorID    *uuid.UUID     `json:"editor_id,omitempty"`
-	Locale      *string        `json:"locale,omitempty"`
-	Title       *string        `json:"title,omitempty"`
-	Slug        *string        `json:"slug,omitempty"`
-	Description *string        `json:"description,omitempty"`
-	Content     map[string]any `json:"content,omitempty"`
+	ID          *uuid.UUID      `json:"id,omitempty"`
+	EditorID    *uuid.UUID      `json:"editor_id,omitempty"`
+	Locale      *string         `json:"locale,omitempty"`
+	Title       *string         `json:"title,omitempty"`
+	Slug        *string         `json:"slug,omitempty"`
+	Description *string         `json:"description,omitempty"`
+	Content     json.RawMessage `json:"content,omitempty"`
 }
 
 type ArticlePatch struct {

@@ -12,38 +12,10 @@ interface SelectMediaProps {
   data: Media;
   onChange: (data: Media) => void;
   setShowModal: (show: boolean) => void;
-  handleFileUpload: (file: File) => Promise<void>;
-  uploading: boolean;
 }
 
 export default function MediaBlock({ data, onChange }: MediaBlockProps) {
   const [showModal, setShowModal] = useState(false);
-  const [uploading, setUploading] = useState(false);
-
-  const handleFileUpload = async (file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("name", file.name); // Used original file name instead of hardcoded string
-    formData.append("type", data.mediaType === "video" ? "video" : "image");
-    formData.append("source", "user");
-
-    try {
-      setUploading(true);
-
-      const putRes = await putMedia(formData);
-      await confirmSave([putRes.storageKey]);
-
-      // Automatically assign uploaded file URL to editor state and close modal
-      // if (putRes.url) {
-      //   onChange({ ...data, url: putRes.url, source: "local" });
-      //   setShowModal(false);
-      // }
-    } catch (err) {
-      alert("Upload failed: " + (err as Error).message);
-    } finally {
-      setUploading(false);
-    }
-  };
 
   return (
     <>
@@ -52,8 +24,6 @@ export default function MediaBlock({ data, onChange }: MediaBlockProps) {
           data={data}
           onChange={onChange}
           setShowModal={setShowModal}
-          handleFileUpload={handleFileUpload}
-          uploading={uploading}
         />
       )}
       <div className="flex gap-2 items-center">
@@ -78,9 +48,9 @@ export default function MediaBlock({ data, onChange }: MediaBlockProps) {
             type="button"
             onClick={() => setShowModal(true)}
             className="border border-gray-300 p-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50"
-            disabled={uploading}
+            disabled={showModal}
           >
-            {uploading ? "Uploading..." : "Browse"}
+            {showModal ? "Selecting..." : "Browse"}
           </button>
         )}
 
@@ -104,45 +74,88 @@ function SelectMedia({
   data,
   onChange,
   setShowModal,
-  handleFileUpload,
-  uploading,
 }: SelectMediaProps) {
   const [uploadedFiles, setUploadedFiles] = useState<MediaItemRes[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let isMounted = true;
-    const fetchUploadedFiles = async () => {
-      try {
-        const mediaFiles = await getMedia();
-        if (isMounted) {
-          setUploadedFiles(mediaFiles?.data || []);
-        }
-      } catch (error) {
-        console.error("Failed to fetch uploaded files:", error);
-        if (isMounted) setUploadedFiles([]);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
     fetchUploadedFiles();
-    return () => {
-      isMounted = false;
-    };
   }, []);
 
+  const fetchUploadedFiles = async () => {
+    try {
+      setLoading(true);
+      const mediaFiles = await getMedia();
+      if (mediaFiles) {
+        setUploadedFiles(mediaFiles?.data || []);
+      }
+    } catch (error) {
+      console.error("Failed to fetch uploaded files:", error);
+      setUploadedFiles([]);
+    } finally {
+      setLoading(false); // Fixed: Ensures loading screen disappears
+    }
+  };
+
+  const handleFileUpload = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("name", file.name);
+    formData.append("type", data.mediaType === "video" ? "video" : "image");
+    formData.append("source", "user");
+
+    try {
+      setUploading(true);
+
+      const putRes = await putMedia(formData);
+      
+      // 1. Capture the saved media returned by confirmSave
+      const savedMedia = await confirmSave([putRes.storageKey]);
+
+      // 2. Prepend the new file(s) to the local state immediately
+      const newMediaItems = savedMedia?.data;
+      if (Array.isArray(newMediaItems) && newMediaItems.length > 0) {
+        setUploadedFiles((prev) => [...newMediaItems, ...prev]);
+      }
+
+    } catch (err) {
+      alert("Upload failed: " + (err as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex justify-center items-center">
-      <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[80vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold text-gray-800">Select Media</h2>
+    <div className="fixed w-full h-full inset-0 z-50 bg-black/50 flex flex-col justify-center items-center">
+
+      <div className="flex items-center mb-4">
+        <h2 className="text-2xl font-bold text-west">Select Media</h2>
+      </div>
+
+      <div className="bg-white rounded-lg p-6 w-full max-w-[85vw] max-h-[90vh] overflow-y-auto">
+
+        <div className="mt-6 flex justify-between items-center border-t border-b py-4">
+          <label className={`cursor-pointer bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors ${uploading ? "opacity-50 pointer-events-none" : ""}`}>
+            {uploading ? "Uploading..." : "+ Upload New File"}
+            <input
+              type="file"
+              accept={data.mediaType === "image" ? "image/*" : "video/*"}
+              disabled={uploading}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleFileUpload(file);
+                e.target.value = ""; // Reset input so re-uploading the same file triggers onChange
+              }}
+              className="hidden"
+            />
+          </label>
           <button
             type="button"
             onClick={() => setShowModal(false)}
-            className="text-gray-500 hover:text-gray-700 text-xl font-bold"
+            className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 transition-colors"
           >
-            ✕
+            Cancel
           </button>
         </div>
 
@@ -151,7 +164,7 @@ function SelectMedia({
         ) : uploadedFiles.length === 0 ? (
           <p className="text-gray-500 text-center py-8">No files found. Upload one below.</p>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 my-4">
             {uploadedFiles.map((file) => {
               const fileKey = file.id || file.url;
               return (
@@ -182,29 +195,6 @@ function SelectMedia({
             })}
           </div>
         )}
-
-        <div className="mt-6 flex justify-between items-center border-t pt-4">
-          <label className={`cursor-pointer bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors ${uploading ? "opacity-50 pointer-events-none" : ""}`}>
-            {uploading ? "Uploading..." : "+ Upload New File"}
-            <input
-              type="file"
-              accept={data.mediaType === "image" ? "image/*" : "video/*"}
-              disabled={uploading}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleFileUpload(file);
-              }}
-              className="hidden"
-            />
-          </label>
-          <button
-            type="button"
-            onClick={() => setShowModal(false)}
-            className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
       </div>
     </div>
   );
