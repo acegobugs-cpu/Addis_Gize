@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"app/internal/domain/entities"
 	"app/internal/domain/services"
 	"app/internal/pkg/errors"
 
@@ -26,19 +27,31 @@ func NewCategoryHandler(categoryService *services.CategoryService) *CategoryHand
 
 // CreateCategoryRequest represents a create category request
 type CreateCategoryRequest struct {
-	Name string `json:"name"`
-	Slug string `json:"slug"`
+	Locale entities.Locale `json:"locale"`
+	Name   string          `json:"name"`
+	Slug   string          `json:"slug"`
 }
 
 // CreateCategory handles creating a new category
 func (h *CategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Request) {
+	catIDStr := r.URL.Query().Get("catId")
+
+	var catID uuid.UUID
+	if catIDStr != "" {
+		var err error
+		catID, err = uuid.Parse(catIDStr)
+		if err != nil {
+			h.handler.RespondError(w, errors.ErrBadRequest)
+			return
+		}
+	}
 	req, ok := r.Context().Value(ValidatedBodyKey).(CreateCategoryRequest)
 	if !ok {
 		h.handler.RespondError(w, errors.ErrInternalServer.W("Failed to validate request", ""))
 		return
 	}
 
-	category, err := h.categoryService.CreateCategory(r.Context(), req.Name, req.Slug)
+	category, err := h.categoryService.CreateCategory(r.Context(), req.Locale, req.Name, req.Slug, &catID)
 	if err != nil {
 		h.handler.RespondError(w, err)
 		return

@@ -17,7 +17,7 @@ services:
 
   # --- MinIO Object Storage ---
   minio:
-    image: minio/minio:latest
+    image: pgsty/minio:latest
     container_name: times-minio
     env_file:
       - ./.env

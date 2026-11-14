@@ -13,7 +13,7 @@ import "./global.css"
 // });
 
 export const metadata: Metadata = {
-  title: "Prime Media",
+  title: "Addis Gize",
   description: "Leading ethiopian new company",
 };
 

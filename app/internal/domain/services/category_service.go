@@ -23,7 +23,7 @@ func NewCategoryService(categoryRepo *repositories.CategoryRepository) *Category
 }
 
 // CreateCategory creates a new category
-func (s *CategoryService) CreateCategory(ctx context.Context, name, slug string) (*entities.Category, error) {
+func (s *CategoryService) CreateCategory(ctx context.Context, locale entities.Locale, name, slug string, catID *uuid.UUID) (*entities.CategoryLocale, error) {
 	// Check if slug already exists
 	exists, err := s.categoryRepo.ExistsBySlug(ctx, slug)
 	if err != nil {
@@ -42,16 +42,23 @@ func (s *CategoryService) CreateCategory(ctx context.Context, name, slug string)
 		return nil, errors.ErrConflict
 	}
 
-	category := entities.NewCategory(name, slug)
-	if err := s.categoryRepo.Create(ctx, category); err != nil {
+	category := entities.NewCategory(locale, name, slug)
+	if catID == nil {
+		if err := s.categoryRepo.Create(ctx, category); err != nil {
+			return nil, errors.ErrInternalServer.W("Failed to create category", "")
+		}
+		return category, nil
+	}
+	if err := s.categoryRepo.AddLocale(ctx, category, catID); err != nil {
 		return nil, errors.ErrInternalServer.W("Failed to create category", "")
 	}
 
 	return category, nil
+
 }
 
 // GetCategoryByID retrieves a category by ID
-func (s *CategoryService) GetCategoryByID(ctx context.Context, id uuid.UUID) (*entities.Category, error) {
+func (s *CategoryService) GetCategoryByID(ctx context.Context, id uuid.UUID) (*entities.Cat, error) {
 	category, err := s.categoryRepo.FindByID(ctx, id)
 	if err != nil {
 		return nil, errors.ErrResourceNotFound
@@ -60,7 +67,7 @@ func (s *CategoryService) GetCategoryByID(ctx context.Context, id uuid.UUID) (*e
 }
 
 // GetCategoryBySlug retrieves a category by slug
-func (s *CategoryService) GetCategoryBySlug(ctx context.Context, slug string) (*entities.Category, error) {
+func (s *CategoryService) GetCategoryBySlug(ctx context.Context, slug string) (*entities.CategoryLocale, error) {
 	category, err := s.categoryRepo.FindBySlug(ctx, slug)
 	if err != nil {
 		return nil, errors.ErrResourceNotFound
@@ -69,7 +76,7 @@ func (s *CategoryService) GetCategoryBySlug(ctx context.Context, slug string) (*
 }
 
 // UpdateCategory updates a category
-func (s *CategoryService) UpdateCategory(ctx context.Context, category *entities.Category) error {
+func (s *CategoryService) UpdateCategory(ctx context.Context, category *entities.CategoryLocale) error {
 	if err := s.categoryRepo.Update(ctx, category); err != nil {
 		return errors.ErrInternalServer.W("Failed to update category", "")
 	}
@@ -85,7 +92,7 @@ func (s *CategoryService) DeleteCategory(ctx context.Context, id uuid.UUID) erro
 }
 
 // ListCategories lists all categories
-func (s *CategoryService) ListCategories(ctx context.Context) ([]*entities.Category, error) {
+func (s *CategoryService) ListCategories(ctx context.Context) ([]*entities.CategoryLocale, error) {
 	categories, err := s.categoryRepo.List(ctx)
 	if err != nil {
 		return nil, errors.ErrInternalServer.W("Failed to list categories", "")

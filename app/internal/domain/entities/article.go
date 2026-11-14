@@ -15,7 +15,7 @@ type Article struct {
 	PublishedAt  time.Time        `json:"published_at"`
 	UpdatedAt    time.Time        `json:"updated_at"`
 	Translations []*ArticleLocale `json:"translations"`
-	Categories   []Category       `json:"categories,omitempty"`
+	Categories   []Cat            `json:"categories,omitempty"`
 }
 
 // NewArticle creates a new article entity
@@ -70,17 +70,17 @@ func (al *ArticleLocale) TableName() string {
 }
 
 type Story struct {
-	ID          uuid.UUID       `json:"id"`
-	ArticleID   *uuid.UUID      `json:"article_id"`
-	Tag         string          `json:"tag"`
-	Media       map[string]any  `json:"media,omitempty"`
-	Categories  []Category      `json:"categories,omitempty"`
-	EditorID    uuid.UUID       `json:"editor_id"`
-	Locale      string          `json:"locale"`
-	Title       string          `json:"title"`
-	Slug        string          `json:"slug"`
-	Description string          `json:"description"`
-	Content     json.RawMessage `json:"content,omitempty"`
+	ID          uuid.UUID        `json:"id"`
+	ArticleID   *uuid.UUID       `json:"article_id"`
+	Tag         string           `json:"tag"`
+	Media       map[string]any   `json:"media,omitempty"`
+	Categories  []CategoryLocale `json:"categories,omitempty"`
+	EditorID    uuid.UUID        `json:"editor_id"`
+	Locale      string           `json:"locale"`
+	Title       string           `json:"title"`
+	Slug        string           `json:"slug"`
+	Description string           `json:"description"`
+	Content     json.RawMessage  `json:"content,omitempty"`
 
 	PublishedAt time.Time `json:"published_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
@@ -106,7 +106,7 @@ type TranslationPatch struct {
 type ArticlePatch struct {
 	Tag          *string           `json:"tag,omitempty"`
 	Media        map[string]any    `json:"media,omitempty"`
-	Categories   []Category        `json:"categories,omitempty"` // Fixed typo from 'categoreis'
+	Categories   []Cat             `json:"categories,omitempty"` // Fixed typo from 'categoreis'
 	Translations *TranslationPatch `json:"translation"`
 }
 

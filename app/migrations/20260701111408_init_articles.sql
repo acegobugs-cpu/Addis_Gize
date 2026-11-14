@@ -4,9 +4,30 @@ SELECT 'up SQL query';
 
 CREATE TABLE IF NOT EXISTS categories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(100) UNIQUE NOT NULL,
-    slug VARCHAR(100) UNIQUE NOT NULL
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS category_locale (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    category_id UUID NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+    locale VARCHAR(10) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    slug VARCHAR(100) NOT NULL,
+    
+    -- Ensure a category only has one translation per locale
+    UNIQUE (category_id, locale),
+    
+    -- Ensure slugs and names are unique WITHIN a specific language 
+    -- (e.g., you can't have two "Politics" categories in English)
+    UNIQUE (locale, slug),
+    UNIQUE (locale, name)
+);
+
+-- 3. Indexes for fast lookups
+CREATE INDEX IF NOT EXISTS idx_category_locale_category_id ON category_locale(category_id);
+CREATE INDEX IF NOT EXISTS idx_category_locale_locale ON category_locale(locale);
+CREATE INDEX IF NOT EXISTS idx_category_locale_slug ON category_locale(slug);
 
 CREATE TABLE IF NOT EXISTS articles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
