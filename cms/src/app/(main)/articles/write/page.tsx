@@ -3,18 +3,19 @@
 import { useState, useEffect, useRef } from "react";
 import Select from "react-select";
 import { useAuth } from "@/app/components/AuthContext";
-import { Category } from "@/app/types/category";
+import { Cat, CategoryLocale, Translation } from "@/app/types/category";
 import MediaBlock from "../../components/mediaBlock";
 import TextEditor, { TextEditorRef } from "../../components/editor/textEditor";
 import { createArticle, getCategories } from "@/app/lib/api";
 import MediaRenderer from "../../components/mediaRenderer";
 import { Media } from "@/app/types/media";
+import { Locale } from "@/app/types/locale";
 
 export default function ArticleForm() {
   const editorRef = useRef<TextEditorRef>(null);
 
   const [formData, setFormData] = useState({
-    locale: "am",
+    locale: "am" as Locale,
     title: "",
     slug: "",
     tag: "primary",
@@ -28,7 +29,7 @@ export default function ArticleForm() {
   });
 
   const [bodyContent, setBodyContent] = useState<any>(null);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [cat, setCat] = useState<Cat[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const { user } = useAuth();
@@ -37,7 +38,7 @@ export default function ArticleForm() {
     const fetchCategories = async () => {
       try {
         const categoriesData = await getCategories();
-        if (categoriesData.data) setCategories(categoriesData.data);
+        if (categoriesData.data) setCat(categoriesData.data);
       } catch {
         setError("Failed to load categories");
       }
@@ -61,25 +62,23 @@ export default function ArticleForm() {
 
     const payload = {
       tag: formData.tag,
-      media: formData.media || null,
       category_ids: formData.category_ids,
+      media: formData.media || null,
       translations: [
         {
-          id: 0,
           locale: formData.locale,
           title: titleText,
           slug: formData.slug,
           description: formData.description.trim(),
           content: bodyJson,                    // Main body from editor
-          editor_id: user?.id || 0,
-          published_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          // published_at: new Date().toISOString(),
+          // updated_at: new Date().toISOString(),
         },
       ],
     };
 
     try {
-      await createArticle(JSON.parse(JSON.stringify(payload)));
+      await createArticle(payload);
       setSuccess(true);
       setError(null);
 
@@ -113,10 +112,14 @@ export default function ArticleForm() {
     setFormData({ ...formData, title, slug });
   };
 
-  const categoryOptions = categories.map((category) => ({
-    value: category.id,
-    label: category.name,
-  }));
+  const categoryOptions = cat.map((category: Cat) => {
+    const translation = category[formData.locale];
+
+    return {
+      value: category.id,
+      label: translation?.name || `Missing Translation (${formData.locale})`, 
+    };
+});
 
   return (
     <div className="max-w-[80%] mx-auto px-4 py-8">
@@ -211,7 +214,7 @@ export default function ArticleForm() {
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Language</label>
               <select
                 value={formData.locale}
-                onChange={(e) => setFormData({ ...formData, locale: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, locale: e.target.value as Locale })}
                 className="w-full border border-gray-300 bg-white text-gray-800 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
                 required
               >

@@ -131,7 +131,7 @@ func (r *Router) setupMiddleware(l *limiter.Limiter) {
 
 	r.router.Use(chiMiddleware.Recoverer)
 	r.router.Use(chiMiddleware.Logger)
-	r.router.Use(middleware.Timeout(r.config.Server.ReadTimeout))
+	// r.router.Use(middleware.Timeout(r.config.Server.ReadTimeout))
 	r.router.Use(middleware.ContentType)
 
 	// CORS
@@ -218,7 +218,7 @@ func (r *Router) setupRoutes(l *limiter.Limiter) {
 			router.Group(func(router chi.Router) {
 				router.Use(r.csrfProtection.Middleware)
 				router.Use(r.authMiddleware.Middleware)
-				router.Post("/", r.articleHandler.CreateArticle)
+				router.Post("/", handlers.ValidateBody[handlers.CreateArticleRequest](r.handler, r.articleHandler.CreateArticle))
 				router.Post("/locale", r.articleHandler.AddLocale)
 			})
 
@@ -247,7 +247,7 @@ func (r *Router) setupRoutes(l *limiter.Limiter) {
 				router.Use(r.authMiddleware.Middleware)
 				router.Post("/", handlers.ValidateBody[handlers.CreateCategoryRequest](r.handler, r.categoryHandler.CreateCategory))
 				router.Route("/{id}", func(router chi.Router) {
-					router.Put("/", r.categoryHandler.UpdateCategory)
+					router.Put("/", handlers.ValidateBody[handlers.CreateCategoryRequest](r.handler, r.categoryHandler.UpdateCategory))
 					router.Delete("/", r.categoryHandler.DeleteCategory)
 				})
 			})

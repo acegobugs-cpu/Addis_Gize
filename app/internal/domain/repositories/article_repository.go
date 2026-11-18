@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"go.uber.org/zap"
 
 	"app/internal/domain/entities"
 	"app/internal/infra/database"
@@ -25,10 +26,10 @@ func NewArticleRepository(db *database.Postgres) *ArticleRepository {
 	return &ArticleRepository{db: db}
 }
 
-func (r *ArticleRepository) Create(ctx context.Context, article *entities.Article) error {
+func (r *ArticleRepository) Create(ctx context.Context, article *entities.Article) (*uuid.UUID, error) {
 	tx, err := r.db.BeginTx(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback(ctx)
 
@@ -37,15 +38,18 @@ func (r *ArticleRepository) Create(ctx context.Context, article *entities.Articl
 		VALUES ($1, $2, $3, $4)
 		RETURNING id
 	`
+
+	var id uuid.UUID
 	err = tx.QueryRow(ctx, query,
 		article.Tag,
 		article.Media,
 		article.PublishedAt,
 		article.UpdatedAt,
-	).Scan(&article.ID)
+	).Scan(&id)
 
 	if err != nil {
-		return fmt.Errorf("failed to create article: %w", err)
+		logger.Error("jj", zap.Error(err))
+		return nil, fmt.Errorf("failed to create article: %w", err)
 	}
 
 	// Create locales
@@ -56,7 +60,7 @@ func (r *ArticleRepository) Create(ctx context.Context, article *entities.Articl
 			RETURNING id
 		`
 		err = tx.QueryRow(ctx, localeQuery,
-			article.ID,
+			id,
 			locale.EditorID,
 			locale.Locale,
 			locale.Title,
@@ -68,16 +72,16 @@ func (r *ArticleRepository) Create(ctx context.Context, article *entities.Articl
 		).Scan(&locale.ID)
 
 		if err != nil {
-			logger.LogError(ctx, err, "")
-			return fmt.Errorf("failed to create article locale: %w", err)
+			logger.Error("jjT", zap.Error(err))
+			return nil, fmt.Errorf("failed to create article locale: %w", err)
 		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	return nil
+	return &id, nil
 }
 
 // Update saves modifications to the article and updates nested associations
@@ -582,40 +586,60 @@ func (r *ArticleRepository) List(ctx context.Context, lang string, limit, offset
 	return articles, nil
 }
 
-func (r *ArticleRepository) ListStories(ctx context.Context, lan string, limit, offset int) ([]*entities.Story, error) {
+func (r *ArticleRepository) ListStories(ctx context.Context, lan entities.Locale, limit, offset int) ([]*entities.Story, error) {
 	query := `
         WITH ranked_articles AS (
 			SELECT 
-				a.id, 
+				a.id As article_id, 
 				a.tag, 
 				a.media, 
+				al.id,
 				al.published_at, 
 				al.updated_at,
 				al.title,
 				al.slug,
 				al.description,
 				al.content,
-				-- Number each article in chronological order (newest first)
+				/* Number each article in chronological order (newest first) */
 				ROW_NUMBER() OVER (ORDER BY al.published_at DESC) AS row_num
 			FROM articles a
 			INNER JOIN article_locale al ON a.id = al.article_id
 			WHERE al.locale = $1
 		)
 		SELECT 
-			id, 
-			tag, 
-			media, 
-			published_at, 
-			updated_at, 
-			title, 
-			slug, 
-			description, 
-			content
-		FROM ranked_articles
-		-- Include everything from last 24h, or top 24 newest overall
-		WHERE published_at >= NOW() - INTERVAL '24 hours' 
-		OR row_num <= 24
-		ORDER BY published_at DESC;
+			ra.article_id, 
+			ra.tag, 
+			ra.media, 
+			ra.id,
+			ra.published_at, 
+			ra.updated_at, 
+			ra.title, 
+			ra.slug, 
+			ra.description, 
+			ra.content,
+			/* Subquery to fetch and aggregate categories into a JSON array */
+			(
+				SELECT COALESCE(
+					json_agg(
+						json_build_object(
+							'id', c.id,
+							'name', cl.name,
+							'slug', cl.slug
+						)
+					), 
+					'[]'::json
+				)
+				FROM article_category ac
+				INNER JOIN categories c ON ac.category_id = c.id
+				INNER JOIN category_locale cl ON c.id = cl.category_id
+				WHERE ac.article_id = ra.article_id 
+				AND cl.locale = $1
+			) AS categories
+		FROM ranked_articles ra
+		/* Include everything from last 24h, or top 24 newest overall */
+		WHERE ra.published_at >= NOW() - INTERVAL '24 hours' 
+		OR ra.row_num <= 24
+		ORDER BY ra.published_at DESC;
     `
 	rows, err := r.db.Query(ctx, query, lan)
 	if err != nil {
@@ -629,15 +653,17 @@ func (r *ArticleRepository) ListStories(ctx context.Context, lan string, limit, 
 
 		// Scan both base article fields and localized fields
 		err := rows.Scan(
-			&article.ID,
+			&article.ArticleID,
 			&article.Tag,
 			&article.Media,
+			&article.ID,
 			&article.PublishedAt,
 			&article.UpdatedAt,
 			&article.Title,       // Added from article_locale
 			&article.Slug,        // Added from article_locale
 			&article.Description, // Added from article_locale
 			&article.Content,     // Added from article_locale
+			&article.Categories,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan article: %w", err)

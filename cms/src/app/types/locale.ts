@@ -1,8 +1,8 @@
 // 1. Union Type
-export type Locale = "am" | "en" | "sw" | "om";
+export type Locale = "en" | "am" | "sw" | "om";
 
 // 2. Readonly array for iterations & dropdowns
-export const SUPPORTED_LOCALES: readonly Locale[] = ["am", "en", "sw", "om"] as const;
+export const SUPPORTED_LOCALES: readonly Locale[] = ["en", "am", "sw", "om"] as const;
 
 // 3. Metadata dictionary for UI rendering
 export const LOCALE_LABELS: Record<Locale, { name: string; nativeName: string }> = {

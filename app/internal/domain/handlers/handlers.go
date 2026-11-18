@@ -46,6 +46,10 @@ func (h *Handler) RespondJSON(w http.ResponseWriter, statusCode int, data any) {
 func (h *Handler) RespondError(w http.ResponseWriter, err error) {
 	appErr := errors.FromAppError(err)
 
+	if appErr == nil {
+		panic("appErr is nil!")
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(appErr.GetStatusCode())
 
@@ -72,13 +76,12 @@ func (h *Handler) GetRequestID(r *http.Request) string {
 }
 
 // ValidateBody acts as an endpoint-specific inline middleware decorator
-// 🟢 FIX: Receiver changed to *Handler so h.RespondError resolves correctly!
 func ValidateBody[T any](h *Handler, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req T
 
 		// 1. Centralized bounded reader + decode
-		r.Body = http.MaxBytesReader(nil, r.Body, 10<<20) // Keeps max upload protection intact
+		r.Body = http.MaxBytesReader(w, r.Body, 10<<20) // Keeps max upload protection intact
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			h.RespondError(w, errors.ErrInvalidInput.W("Malformed JSON payload", err.Error()))
 			return

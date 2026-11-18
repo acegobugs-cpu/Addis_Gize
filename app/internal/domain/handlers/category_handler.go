@@ -34,24 +34,13 @@ type CreateCategoryRequest struct {
 
 // CreateCategory handles creating a new category
 func (h *CategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Request) {
-	catIDStr := r.URL.Query().Get("catId")
-
-	var catID uuid.UUID
-	if catIDStr != "" {
-		var err error
-		catID, err = uuid.Parse(catIDStr)
-		if err != nil {
-			h.handler.RespondError(w, errors.ErrBadRequest)
-			return
-		}
-	}
 	req, ok := r.Context().Value(ValidatedBodyKey).(CreateCategoryRequest)
 	if !ok {
 		h.handler.RespondError(w, errors.ErrInternalServer.W("Failed to validate request", ""))
 		return
 	}
 
-	category, err := h.categoryService.CreateCategory(r.Context(), req.Locale, req.Name, req.Slug, &catID)
+	category, err := h.categoryService.CreateCategory(r.Context(), req.Locale, req.Name, req.Slug)
 	if err != nil {
 		h.handler.RespondError(w, err)
 		return
@@ -89,7 +78,25 @@ func (h *CategoryHandler) GetCategoryBySlug(w http.ResponseWriter, r *http.Reque
 
 // UpdateCategory handles updating a category
 func (h *CategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
-	h.handler.RespondJSON(w, http.StatusOK, map[string]string{"message": "Update category endpoint"})
+	idstr := chi.URLParam(r, "id")
+	id, err := uuid.Parse(idstr)
+	if err != nil {
+		h.handler.RespondError(w, errors.ErrBadRequest)
+	}
+
+	req, ok := r.Context().Value(ValidatedBodyKey).(CreateCategoryRequest)
+	if !ok {
+		h.handler.RespondError(w, errors.ErrInternalServer.W("Failed to validate request", ""))
+		return
+	}
+
+	err = h.categoryService.UpsertCategory(r.Context(), id, req.Locale, req.Name, req.Slug)
+	if err != nil {
+		h.handler.RespondError(w, err)
+		return
+	}
+
+	h.handler.RespondJSON(w, http.StatusCreated, nil)
 }
 
 // DeleteCategory handles deleting a category

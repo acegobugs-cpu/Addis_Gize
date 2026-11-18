@@ -54,30 +54,33 @@ func (s *ArticleService) CreateArticle(ctx context.Context, article *entities.Ar
 	}
 
 	// Create article
-	if err := s.articleRepo.Create(ctx, article); err != nil {
+	ID, err := s.articleRepo.Create(ctx, article)
+	if err != nil {
 		return errors.ErrInternalServer.W("Failed to create article", "")
 	}
 
 	// Add categories
 	for _, catID := range categoryIDs {
-		if err := s.articleRepo.AddCategory(ctx, article.ID, catID); err != nil {
+		if err := s.articleRepo.AddCategory(ctx, *ID, catID); err != nil {
 			return errors.ErrInternalServer.W("Failed to add category to article", "")
 		}
 	}
 
 	// 2. Index ORIGINAL article locale into Elasticsearch
-	for _, locale := range article.Translations {
-		plainContent := workers.ExtractTextFromTiptap(string(locale.Content))
-		_ = s.searchSvc.IndexArticle(ctx, search.ArticleDocument{
-			ID:          fmt.Sprintf("%s_%s", article.ID, locale.Locale),
-			ArticleID:   article.ID.String(),
-			Locale:      locale.Locale,
-			Title:       locale.Title,
-			Slug:        locale.Slug,
-			Description: locale.Description,
-			ContentText: plainContent,
-			CreatedAt:   time.Now().Format(time.RFC3339),
-		})
+	if s.searchSvc != nil {
+		for _, locale := range article.Translations {
+			plainContent := workers.ExtractTextFromTiptap(string(locale.Content))
+			_ = s.searchSvc.IndexArticle(ctx, search.ArticleDocument{
+				ID:          fmt.Sprintf("%s_%s", ID, locale.Locale),
+				ArticleID:   ID.String(),
+				Locale:      locale.Locale,
+				Title:       locale.Title,
+				Slug:        locale.Slug,
+				Description: locale.Description,
+				ContentText: plainContent,
+				CreatedAt:   time.Now().Format(time.RFC3339),
+			})
+		}
 	}
 
 	// 🚀 Trigger background translation for missing locales!
@@ -159,7 +162,7 @@ func (s *ArticleService) ListArticles(ctx context.Context, lan string, limit, of
 }
 
 // ListArticles lists all articles with pagination
-func (s *ArticleService) LanArticles(ctx context.Context, lan string, limit, offset int) ([]*entities.Story, error) {
+func (s *ArticleService) LanArticles(ctx context.Context, lan entities.Locale, limit, offset int) ([]*entities.Story, error) {
 	articles, err := s.articleRepo.ListStories(ctx, lan, limit, offset)
 	if err != nil {
 		return nil, errors.ErrInternalServer.W("Failed to list articles", "")

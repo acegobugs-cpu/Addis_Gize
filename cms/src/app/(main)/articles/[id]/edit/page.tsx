@@ -10,7 +10,7 @@ import { deleteLocale, getCategories, updateArticle, getArticleById } from "@/ap
 import { Article, ArticleTranslation } from "@/app/types/article";
 import MediaBlock from "@/app/(main)/components/mediaBlock";
 import TextEditor from "@/app/(main)/components/editor/textEditor";
-import { Category } from "@/app/types/category";
+import { CategoryLocale } from "@/app/types/category";
 import { Media } from "@/app/types/media";
 
 
@@ -21,7 +21,7 @@ export default function EditArticlePage() {
   const articleId = params?.id as string;
 
   const [article, setArticle] = useState<Article | null>(null);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<CategoryLocale[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 

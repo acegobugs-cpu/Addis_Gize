@@ -1,4 +1,4 @@
-import { Category } from "./category";
+import { Cat, CategoryLocale } from "./category";
 import { Media } from "./media";
 
 export interface Article {
@@ -6,7 +6,7 @@ export interface Article {
   tag: string;
   media?: Media;
   category_ids: string[];
-  categories: Category[];
+  categories: Cat[];
   translations: ArticleTranslation[];
   created_at: string;
   updated_at: string;
@@ -31,7 +31,7 @@ export interface Story {
   tag: string;
   media?: Media;
   category_ids: string[];
-  categories: Category[];
+  categories: CategoryLocale[];
   locale: string;
   title: string;
   slug: string;
@@ -47,7 +47,24 @@ export interface ArticleUpdate {
   tag: string;
   media?: Media;
   category_ids: string[];
-  categories?: Category[];
+  categories?: Cat[];
   translation: Partial<ArticleTranslation>;
   updated_at: string;
+}
+
+export interface ArticleCreate {
+  tag: string;
+  category_ids: string[];
+  media?: Media;
+  translation: Partial<ArticleTranslationCreate>;
+}
+
+export interface ArticleTranslationCreate {
+  locale: string;
+  title: string;
+  slug: string;
+  description: string;
+  content?: any; // JSON content from Tiptap editor
+  // published_at?: string;
+  // updated_at?: string;
 }

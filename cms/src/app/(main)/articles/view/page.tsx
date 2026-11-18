@@ -2,9 +2,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/app/components/AuthContext";
 import MediaRenderer from "../../components/mediaRenderer";
-import {Article, ArticleTranslation} from "@/app/types/article";
+import {Article, ArticleTranslation, Story} from "@/app/types/article";
 import Link from "next/link";
-import {  deleteArticle, getArticles } from "@/app/lib/api";
+import {  deleteArticle, getStories } from "@/app/lib/api";
 
 import {
   EllipsisVerticalIcon,
@@ -14,19 +14,19 @@ import {
   GlobeAltIcon,
 } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
-import { Category } from "@/app/types/category";
+import { CategoryLocale } from "@/app/types/category";
+import { Locale } from "@/app/types/locale";
 
 export default function Articles() {
   const router = useRouter();
-  const [articles, setArticles] = useState<Article[]>([]);
+  const [stories, setStories] = useState<Story[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
+  const [selectedArticle, setSelectedArticle] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dialogPos, setDialogPos] = useState({ x: 0, y: 0 });
   const [lan, setLan] = useState("am");
 
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const { user } = useAuth();
 
   useEffect(() => {
     fetchArticles();
@@ -50,10 +50,8 @@ export default function Articles() {
   const fetchArticles = async () => {
     setLoading(true);
     try {
-      const res = await getArticles(lan);
-      if (res.data) {
-        setArticles(res.data);
-      }
+      const res = await getStories(lan as Locale);
+      setStories(res.data || []);
     } catch (err) {
       console.error("Error fetching articles:", err);
       setError("Failed to fetch articles");
@@ -65,15 +63,15 @@ export default function Articles() {
   const handleDelete = async () => {
     if (!selectedArticle) return;
     try {
-      await deleteArticle(selectedArticle.id);
-      setArticles((prev) => prev.filter((art) => art.id !== selectedArticle.id));
+      await deleteArticle(selectedArticle);
+      setStories((prev) => prev.filter((art) => art.id !== selectedArticle));
       closeDialog();
     } catch (err) {
       setError("Failed to delete article");
     }
   };
 
-  const openDialog = (article: Article, event: React.MouseEvent) => {
+  const openDialog = (id: string , event: React.MouseEvent) => {
     event.stopPropagation();
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     // Calculate positioning to keep popover inside screen bounds
@@ -81,7 +79,7 @@ export default function Articles() {
       x: Math.min(rect.right - 180, window.innerWidth - 200),
       y: rect.bottom + 8,
     });
-    setSelectedArticle(article);
+    setSelectedArticle(id);
   };
 
   const closeDialog = () => {
@@ -137,20 +135,17 @@ export default function Articles() {
             />
           ))}
         </div>
-      ) : articles.length > 0 ? (
+      ) : stories.length > 0 ? (
         <div className="grid md:grid-cols-3 grid-cols-1 gap-6">
-          {articles.map((article) => {
-            // Find locale match for current selected language
-            const localeData = article.translations?.find((tr:ArticleTranslation) => tr.locale === lan);
-
+          {stories.map((story) => {
             return (
               <div
-                key={article.id}
+                key={story.article_id}
                 className="group relative bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 flex flex-col"
               >
                 {/* Options Menu Toggle */}
                 <button
-                  onClick={(e) => openDialog(article, e)}
+                  onClick={(e) => openDialog(story.article_id as string, e)}
                   className="absolute top-3 right-3 z-10 bg-white/90 backdrop-blur-sm text-gray-700 rounded-full p-2 hover:bg-white hover:text-black shadow-sm transition"
                   aria-label="Open options"
                 >
@@ -159,12 +154,12 @@ export default function Articles() {
 
                 {/* Media Section */}
                 <div className="relative w-full h-48 bg-gray-50 overflow-hidden border-b border-gray-100">
-                  {article.media ? (
+                  {story.media ? (
                     <MediaRenderer
                       media={
-                        typeof article.media === "string"
-                          ? JSON.parse(article.media)
-                          : article.media
+                        typeof story.media === "string"
+                          ? JSON.parse(story.media)
+                          : story.media
                       }
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
@@ -174,9 +169,9 @@ export default function Articles() {
                     </div>
                   )}
 
-                  {article.tag && (
+                  {story.tag && (
                     <span className="absolute bottom-3 left-3 bg-gray-900/80 backdrop-blur-md text-white text-[10px] font-uppercase tracking-wider px-2.5 py-1 rounded-md">
-                      {article.tag}
+                      {story.tag}
                     </span>
                   )}
                 </div>
@@ -185,11 +180,11 @@ export default function Articles() {
                 <div className="p-5 flex-1 flex flex-col justify-between">
                   <div className="space-y-2">
                     <p className="text-xs font-medium text-indigo-600">
-                      {article.categories?.map((cat:Category) => cat.name).join(", ") || "General"}
+                      {story.categories?.map((cat:CategoryLocale) => cat.name).join(", ")}
                     </p>
 
                     <h2 className="text-lg font-serif font-bold text-gray-900 line-clamp-2 leading-snug">
-                      {localeData?.title || (
+                      {story.title || (
                         <span className="text-gray-400 italic">
                           Untranslated ({lan})
                         </span>
@@ -197,7 +192,7 @@ export default function Articles() {
                     </h2>
 
                     <p className="text-xs text-gray-600 line-clamp-3 leading-relaxed">
-                      {localeData?.description ||
+                      {story.description ||
                         "No summary available for this language translation."}
                     </p>
                   </div>
@@ -230,7 +225,7 @@ export default function Articles() {
             <button
               onClick={() => {
                 closeDialog();
-                router.push(`/articles/${selectedArticle.id}/locale`);
+                router.push(`/articles/${selectedArticle}/locale`);
               }}
               className="w-full flex items-center text-left text-xs font-medium text-gray-700 px-2.5 py-2 rounded-lg hover:bg-gray-50 hover:text-indigo-600 transition"
             >
@@ -242,7 +237,7 @@ export default function Articles() {
             <button
               onClick={() => {
                 closeDialog();
-                router.push(`/articles/${selectedArticle.id}/edit`);
+                router.push(`/articles/${selectedArticle}/edit`);
               }}
               className="w-full flex items-center text-left text-xs font-medium text-gray-700 px-2.5 py-2 rounded-lg hover:bg-gray-50 hover:text-amber-600 transition"
             >

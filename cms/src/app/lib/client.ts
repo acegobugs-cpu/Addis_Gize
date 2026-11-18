@@ -49,6 +49,7 @@ class BackendClient {
   }
 
   private async request(path: string, options: RequestOptions = {}): Promise<Response> {
+    // console.log("requesrrrt ",options.json)
     const url = `${this.baseUrl}${path}`;
     const nextHeaders = await headers();
     const nextCookies = await cookies();

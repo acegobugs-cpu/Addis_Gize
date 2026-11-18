@@ -1,7 +1,8 @@
 "use server";
 
-import { Article, ArticleTranslation, ArticleUpdate } from "../types/article";
-import { Category } from "../types/category";
+import { Article, ArticleCreate, ArticleTranslation, ArticleUpdate, Story } from "../types/article";
+import { Cat, CategoryLocale } from "../types/category";
+import { Locale } from "../types/locale";
 import { MediaItemRes } from "../types/media";
 import { AuthResponse, Invite, RegisterData, User } from "../types/user";
 // 1. Import your advanced BackendClient instance 
@@ -120,7 +121,7 @@ export async function getArticleBySlug(slug: string) {
 }
 
 
-export async function createArticle(data: Partial<Article>) {
+export async function createArticle(data: Partial<ArticleCreate>) {
   const res = await backend.post("/articles", data);
   return handleResponse<Article>(res);
 }
@@ -138,6 +139,11 @@ export async function deleteArticle(id: string) {
 // ==========================================
 // LOCALE ACTIONS
 // ==========================================
+
+export async function getStories(lan: Locale){
+  const res = await backend.get(`/articles/lan/${lan}`);
+  return handleResponse<Story[]>(res);
+}
 
 export async function getArticleLocales(id: string){
   const res = await backend.get(`/articles/${id}/lan`);
@@ -160,17 +166,17 @@ export async function deleteLocale(id: string) {
 
 export async function getCategories() {
   const res = await backend.get("/categories");
-  return handleResponse<Category[]>(res);
+  return handleResponse<Cat[]>(res);
 }
 
 export async function getCategoryById(id: string) {
   const res = await backend.get(`/categories/${id}`);
-  return handleResponse<Category>(res);
+  return handleResponse<CategoryLocale>(res);
 }
 
 export async function getCategoryBySlug(slug: string) {
   const res = await backend.get(`/categories/slug/${slug}`);
-  return handleResponse<Category>(res);
+  return handleResponse<CategoryLocale>(res);
 }
 
 export async function getArticlesByCategory(categoryId: string) {
@@ -180,17 +186,17 @@ export async function getArticlesByCategory(categoryId: string) {
 
 export async function getCategoriesByArticle(articleId: string) {
   const res = await backend.get(`/categories/article/${articleId}`);
-  return handleResponse<Category[]>(res);
+  return handleResponse<CategoryLocale[]>(res);
 }
 
-export async function createCategory(data: Partial<Category>) {
+export async function createCategory(data: Partial<CategoryLocale>) {
   const res = await backend.post("/categories", data);
-  return handleResponse<Category>(res);
+  return handleResponse<CategoryLocale>(res);
 }
 
-export async function updateCategory(id: string, data: Partial<Category>) {
+export async function updateCategory(id: string, data: Partial<CategoryLocale>) {
   const res = await backend.put(`/categories/${id}`, data);
-  return handleResponse<Category>(res);
+  return handleResponse<CategoryLocale>(res);
 }
 
 export async function deleteCategory(id: string) {

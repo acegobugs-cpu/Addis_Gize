@@ -23,7 +23,7 @@ func NewCategoryService(categoryRepo *repositories.CategoryRepository) *Category
 }
 
 // CreateCategory creates a new category
-func (s *CategoryService) CreateCategory(ctx context.Context, locale entities.Locale, name, slug string, catID *uuid.UUID) (*entities.CategoryLocale, error) {
+func (s *CategoryService) CreateCategory(ctx context.Context, locale entities.Locale, name, slug string) (*entities.CategoryLocale, error) {
 	// Check if slug already exists
 	exists, err := s.categoryRepo.ExistsBySlug(ctx, slug)
 	if err != nil {
@@ -43,14 +43,8 @@ func (s *CategoryService) CreateCategory(ctx context.Context, locale entities.Lo
 	}
 
 	category := entities.NewCategory(locale, name, slug)
-	if catID == nil {
-		if err := s.categoryRepo.Create(ctx, category); err != nil {
-			return nil, errors.ErrInternalServer.W("Failed to create category", "")
-		}
-		return category, nil
-	}
-	if err := s.categoryRepo.AddLocale(ctx, category, catID); err != nil {
-		return nil, errors.ErrInternalServer.W("Failed to create category", "")
+	if err := s.categoryRepo.Create(ctx, category); err != nil {
+		return nil, errors.ErrInternalServer.W("Failed to create categoryy", "")
 	}
 
 	return category, nil
@@ -76,6 +70,15 @@ func (s *CategoryService) GetCategoryBySlug(ctx context.Context, slug string) (*
 }
 
 // UpdateCategory updates a category
+func (s *CategoryService) UpsertCategory(ctx context.Context, id uuid.UUID, locale entities.Locale, name, slug string) error {
+	category := entities.NewCategory(locale, name, slug)
+	if err := s.categoryRepo.Upsert(ctx, id, category); err != nil {
+		return errors.ErrInternalServer.W("Failed to update category", "")
+	}
+	return nil
+}
+
+// UpdateCategory updates a category
 func (s *CategoryService) UpdateCategory(ctx context.Context, category *entities.CategoryLocale) error {
 	if err := s.categoryRepo.Update(ctx, category); err != nil {
 		return errors.ErrInternalServer.W("Failed to update category", "")
@@ -92,7 +95,7 @@ func (s *CategoryService) DeleteCategory(ctx context.Context, id uuid.UUID) erro
 }
 
 // ListCategories lists all categories
-func (s *CategoryService) ListCategories(ctx context.Context) ([]*entities.CategoryLocale, error) {
+func (s *CategoryService) ListCategories(ctx context.Context) ([]*entities.Cat, error) {
 	categories, err := s.categoryRepo.List(ctx)
 	if err != nil {
 		return nil, errors.ErrInternalServer.W("Failed to list categories", "")

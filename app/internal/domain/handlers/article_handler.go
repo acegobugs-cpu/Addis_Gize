@@ -50,15 +50,14 @@ type ArticleLocaleRequest struct {
 
 // CreateArticle handles creating a new article
 func (h *ArticleHandler) CreateArticle(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	var req CreateArticleRequest
-	if err := h.handler.ParseJSON(r, &req); err != nil {
-		h.handler.RespondError(w, errors.ErrInvalidInput)
+	req, ok := r.Context().Value(ValidatedBodyKey).(CreateArticleRequest)
+	if !ok {
+		h.handler.RespondError(w, errors.ErrBadRequest.W("Failed to validate request", ""))
 		return
 	}
 
 	// Get editor ID from context
-	editorID, ok := appContext.GetUserID(ctx)
+	editorID, ok := appContext.GetUserID(r.Context())
 	if !ok {
 		h.handler.RespondError(w, errors.ErrUnauthorized)
 		return
@@ -230,9 +229,11 @@ func (h *ArticleHandler) ListArticles(w http.ResponseWriter, r *http.Request) {
 func (h *ArticleHandler) LanArticles(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	// 1. Extract the locale parameter from the URL path
-	lan := chi.URLParam(r, "lan")
-	if lan == "" {
-		h.handler.RespondError(w, errors.ErrBadRequest.W(" ", ""))
+	lanStr := chi.URLParam(r, "lan")
+	lan := entities.Locale(lanStr)
+
+	if !lan.IsValid() { // Assuming you built an IsValid method on entities.Locale
+		h.handler.RespondError(w, errors.ErrBadRequest.W("Unsupported language requested", ""))
 		return
 	}
 

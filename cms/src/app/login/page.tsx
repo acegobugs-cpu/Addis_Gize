@@ -76,7 +76,7 @@ export default function Login() {
     <div className="relative z-10 w-full max-w-md p-10 rounded-2xl shadow-2xl bg-canvas/95 backdrop-blur-sm border border-border/50">
       {/* Brand title now uses main brand color (East) */}
       <h1 className="text-4xl font-bold text-center mb-8 text-west tracking-tight">
-        Prime Media
+        Addis Gize
       </h1>
 
       <form onSubmit={handleSubmit} className="space-y-6">

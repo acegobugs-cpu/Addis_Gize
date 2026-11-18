@@ -74,7 +74,7 @@ type Story struct {
 	ArticleID   *uuid.UUID       `json:"article_id"`
 	Tag         string           `json:"tag"`
 	Media       map[string]any   `json:"media,omitempty"`
-	Categories  []CategoryLocale `json:"categories,omitempty"`
+	Categories  []CatTranslation `json:"categories,omitempty"`
 	EditorID    uuid.UUID        `json:"editor_id"`
 	Locale      string           `json:"locale"`
 	Title       string           `json:"title"`
